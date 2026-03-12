@@ -146,7 +146,7 @@ It does four important things:
 
 1. enables brew setup/update services via `systemctl preset`
 2. installs `distrobox` via `rpm-ostree install`
-3. runs the ZFS install helper against `AKMODS_IMAGE`
+3. runs the ZFS install helper against the resolved akmods cache image reference
 4. writes repository-specific signing policy for `ghcr.io/danathar/zfs-kinoite-containerfile`
 5. finalizes the image with `ostree container commit`
 
@@ -156,6 +156,15 @@ The signing-policy step is now a pure Python helper:
 
 That removed the earlier shell script that embedded an inline Python block just
 to write `policy.json`.
+
+Fedora-version handling is intentionally dynamic here:
+
+1. workflow runs normally pass an exact `AKMODS_IMAGE` build argument
+2. local builds can rely on `AKMODS_IMAGE_TEMPLATE` instead
+3. the helper fills in `{fedora}` by asking the selected base image which Fedora
+   major version it is based on
+4. that keeps the root `Containerfile` from hard-coding `43`, `44`, or any
+   other future Fedora major version into its local-build fallback
 
 ### 4. Multi-Kernel ZFS Install Logic
 

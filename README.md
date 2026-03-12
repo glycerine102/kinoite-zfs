@@ -158,6 +158,13 @@ Three workflow-side simplifications now support that image build:
 2. the shared akmods cache publishes a `main-<fedora>-metadata` metadata tag so later validation runs can usually answer cache-reuse questions from registry metadata alone
 3. small repo-owned Python helpers now handle registry-context export, candidate-tag generation, branch-tag composition, and signing-policy file generation instead of leaving that logic inline in workflow or shell snippets
 
+One Fedora-version detail matters here:
+
+1. GitHub Actions usually passes an exact `AKMODS_IMAGE` reference for the detected Fedora major version
+2. local builds do not need a hard-coded Fedora major version in `Containerfile`
+3. when `AKMODS_IMAGE` is not passed, the install helper renders `AKMODS_IMAGE_TEMPLATE`
+   with the Fedora major version detected from the chosen base image itself
+
 The ZFS install step still has one important workaround:
 
 - if the base image ships more than one installed kernel under `/lib/modules`, the helper installs one `kmod-zfs` package through `rpm-ostree` and unpacks the remaining kernel payloads directly into the image root before running `depmod`
