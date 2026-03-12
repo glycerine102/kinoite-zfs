@@ -40,6 +40,7 @@ If a term is unfamiliar, check the shared glossary first:
 1. [`ci_tools/compute_branch_metadata.py`](../ci_tools/compute_branch_metadata.py)
 2. [`ci_tools/promote_stable.py`](../ci_tools/promote_stable.py)
 3. [`ci_tools/sign_image.py`](../ci_tools/sign_image.py)
+   - used by branch/main publish flows when the signing secret is present
 
 ### 7. Tests
 

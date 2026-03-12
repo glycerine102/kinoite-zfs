@@ -142,6 +142,7 @@ Because candidate and stable tags are in the same repository, the trust model is
 
 1. `build.yml`: candidate-first build and promotion
 2. `build-branch.yml`: read-only validation inputs plus branch-tagged push
+   - signs the branch image only when `SIGNING_SECRET` is available to that run
 3. `build-pr.yml`: read-only validation inputs plus no-push build
 
 ## Design Principles
