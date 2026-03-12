@@ -3,12 +3,20 @@ name: Install Signing Tools
 description: Install skopeo and cosign in Ubuntu runner jobs that need to push or sign images.
 
 runs:
+  # This action is intentionally small. It only installs the command-line tools
+  # needed later in the job, so the publish and promote steps can stay focused
+  # on repository-specific logic.
   using: composite
   steps:
+    # `skopeo` copies container images and inspects remote image references
+    # without requiring a full local pull. We use it for promotion and digest
+    # verification work.
     - shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y skopeo
+    # `cosign` is the signing tool used to produce and verify image signatures.
+    # Installing it here keeps the later signing steps short and readable.
     - uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22
       with:
         cosign-release: v2.6.1

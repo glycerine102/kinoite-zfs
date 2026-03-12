@@ -27,14 +27,23 @@ inputs:
     default: ""
 
 runs:
+  # This action owns the publication sequence: authenticate, push one tag, then
+  # sign the pushed digest when a private key is available. Keeping those steps
+  # together reduces the chance that one workflow path publishes differently
+  # from another.
   using: composite
   steps:
+    # Authenticate once so both the push action and any later `skopeo` or
+    # `cosign` calls can talk to GHCR as the current workflow actor.
     - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
       with:
         registry: ghcr.io
         username: ${{ inputs.registry_username }}
         password: ${{ inputs.registry_password }}
 
+    # Push the exact local image tag built earlier in the workflow. Publication
+    # is separated from the build step on purpose so validation-only workflows
+    # can stop before this point.
     - uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c
       env:
         REGISTRY_USER: ${{ inputs.registry_username }}
@@ -46,9 +55,13 @@ runs:
         username: ${{ env.REGISTRY_USER }}
         password: ${{ env.REGISTRY_PASSWORD }}
 
+    # Install signing tools only when signing is enabled for this workflow path.
+    # Branch builds for bot accounts, for example, skip signing entirely.
     - if: inputs.cosign_private_key != ''
       uses: ./.github/actions/install-signing-tools
 
+    # Sign the pushed image by digest, not by a mutable tag name. A tag such as
+    # `latest` can move later, but a digest names one exact image forever.
     - if: inputs.cosign_private_key != ''
       shell: bash
       env:

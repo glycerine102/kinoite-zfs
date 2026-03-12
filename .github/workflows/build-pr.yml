@@ -1,5 +1,7 @@
 name: Validate Pull Request Image Build
 
+# Pull requests only need to prove that the proposed code can still build the
+# image correctly. They intentionally stop before any push or signing step.
 on:
   pull_request:
     paths-ignore:
@@ -9,6 +11,7 @@ on:
       - "**/*.md"
 
 concurrency:
+  # Keep only the newest validation run for a given pull request reference.
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 
@@ -21,14 +24,20 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
+      # Shared defaults keep branch, pull request, and main workflows aligned.
       - id: defaults
         name: Load repository defaults
         uses: ./.github/actions/load-ci-defaults
 
+      # The image owner path is still needed here because the build embeds the
+      # public image repository path into the signing-policy files inside the
+      # image, even though this workflow does not push anything.
       - id: registry
         name: Prepare registry context
         uses: ./.github/actions/prepare-registry-context
 
+      # Reuse the same input-resolution and cache-verification logic as the
+      # production workflow so a green pull request actually means something.
       - name: Resolve inputs and verify shared akmods cache
         id: prepare
         shell: bash
@@ -40,6 +49,8 @@ jobs:
         run: |
           python3 -m ci_tools.cli prepare-validation-build
 
+      # The image is built locally only. If this step succeeds, the pull request
+      # has proven that its Containerfile and workflow changes still compose.
       - name: Build validation image locally
         uses: ./.github/actions/build-native-image
         with:

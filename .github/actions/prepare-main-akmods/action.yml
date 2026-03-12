@@ -79,8 +79,15 @@ outputs:
     value: ${{ steps.cache.outputs.exists }}
 
 runs:
+  # This composite action is the "front half" of the main workflow. It decides
+  # what this run should build, records those choices, and refreshes the shared
+  # ZFS module cache only when the current cache no longer matches the primary
+  # kernel we support.
   using: composite
   steps:
+    # Resolve every moving input up front. This keeps the rest of the workflow
+    # deterministic for the duration of the run, even if an upstream `latest`
+    # tag changes while the job is still running.
     - id: resolve
       name: Resolve build inputs for this run
       shell: bash
@@ -91,6 +98,9 @@ runs:
       run: |
         python3 -m ci_tools.cli resolve-build-inputs
 
+    # Save a plain JSON summary of the resolved inputs. In GitHub Actions,
+    # an "artifact" is a file saved from the run so it can be downloaded later
+    # for debugging or audit work.
     - name: Write build inputs manifest
       shell: bash
       env:
@@ -112,6 +122,8 @@ runs:
       run: |
         python3 -m ci_tools.cli write-build-inputs-manifest
 
+    # Upload the manifest as an artifact so a later investigation can answer
+    # "what exactly did this successful or failed run try to build?"
     - name: Upload build inputs manifest
       uses: actions/upload-artifact@v7
       with:
@@ -119,6 +131,8 @@ runs:
         path: artifacts/build-inputs.json
         if-no-files-found: error
 
+    # Reuse the shared akmods cache only when it already contains a matching
+    # module build for the primary kernel this image is expected to boot with.
     - id: cache
       name: Check for existing shared akmods cache
       shell: bash
@@ -129,6 +143,9 @@ runs:
       run: |
         python3 -m ci_tools.cli check-akmods-cache
 
+    # Always verify that the pinned akmods source commit is fetchable. This
+    # avoids a later surprise where the cache looked reusable, but the source
+    # pin itself was wrong or no longer available.
     - name: Clone pinned upstream akmods tooling
       shell: bash
       env:
@@ -137,6 +154,9 @@ runs:
       run: |
         python3 -m ci_tools.cli akmods-clone-pinned
 
+    # Only rewrite the ZFS target when we are about to build a fresh shared
+    # cache. The existing cache path can skip this because nothing new will be
+    # published in that case.
     - name: Configure shared ZFS target in self-hosted namespace
       if: inputs.rebuild_akmods == 'true' || steps.cache.outputs.exists != 'true'
       shell: bash
@@ -147,6 +167,9 @@ runs:
       run: |
         python3 -m ci_tools.cli akmods-configure-zfs-target
 
+    # This is the expensive step. It builds the precompiled ZFS kernel module
+    # cache only when the caller explicitly requested a rebuild or when the
+    # existing cache does not match the current primary kernel.
     - name: Build and publish shared self-hosted ZFS akmods image
       if: inputs.rebuild_akmods == 'true' || steps.cache.outputs.exists != 'true'
       shell: bash

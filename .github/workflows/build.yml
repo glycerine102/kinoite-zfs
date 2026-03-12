@@ -1,7 +1,14 @@
 name: Build And Promote Main Image
 
+# This is the production workflow. It resolves the current Fedora base image,
+# ensures there is a matching ZFS module build for the primary kernel we
+# support, builds a candidate image, and only then promotes that tested image
+# to the stable `latest` tag.
 on:
   schedule:
+    # GitHub cron expressions use Coordinated Universal Time (UTC). `00 06`
+    # means 06:00 UTC each day, which is 01:00 in New York during standard
+    # time and 02:00 during daylight saving time.
     - cron: "00 06 * * *"
 
   push:
@@ -14,6 +21,8 @@ on:
       - "**/*.md"
 
   workflow_dispatch:
+    # `workflow_dispatch` is GitHub's name for a manual run started from the
+    # web interface or the `gh` command-line tool.
     inputs:
       rebuild_akmods:
         description: Force rebuild of shared self-hosted ZFS akmods
@@ -42,6 +51,8 @@ on:
         type: string
 
 concurrency:
+  # Never let two `main` runs race to publish images. If a newer run starts, the
+  # older one is cancelled before it can publish something based on older input.
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 
@@ -70,15 +81,23 @@ jobs:
       contents: read
       packages: write
     container:
+      # The akmods job runs inside a privileged build container because it needs
+      # the kernel-module build tooling and container storage access expected by
+      # the upstream akmods workflow we are reusing.
       image: ${{ github.event.inputs.build_container_image || 'ghcr.io/ublue-os/devcontainer:latest' }}
       options: "--privileged --volume /:/host-sys --volume /var/lib/containers:/var/lib/containers --security-opt seccomp=unconfined --security-opt label=disable --user 0:0"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
+      # Load the repository's pinned defaults, including the akmods fork commit
+      # and the default floating base-image reference.
       - id: defaults
         name: Load repository defaults
         uses: ./.github/actions/load-ci-defaults
 
+      # This action handles the preparation work that would otherwise dominate
+      # the workflow file: resolve moving inputs, save a manifest artifact,
+      # verify the current shared cache, and rebuild that cache only when needed.
       - name: Resolve inputs, verify cache state, and refresh shared akmods when required
         id: prepare
         uses: ./.github/actions/prepare-main-akmods
@@ -102,14 +121,19 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
+      # Re-load defaults here because each GitHub job runs on a fresh runner.
       - id: defaults
         name: Load repository defaults
         uses: ./.github/actions/load-ci-defaults
 
+      # The registry context step normalizes the owner name so every later GHCR
+      # reference uses one consistent, lowercase path.
       - id: registry
         name: Prepare registry context
         uses: ./.github/actions/prepare-registry-context
 
+      # The candidate tag is the image that gets tested first. Promotion happens
+      # later by copying this already-built image to `latest` only after success.
       - name: Compute candidate tag
         id: tags
         shell: bash
@@ -118,6 +142,8 @@ jobs:
         run: |
           python3 -m ci_tools.cli compute-candidate-tag
 
+      # Build the candidate image against the exact base-image digest and the
+      # shared akmods cache chosen in the previous job.
       - name: Build candidate image locally
         uses: ./.github/actions/build-native-image
         with:
@@ -129,6 +155,9 @@ jobs:
           image_repo: ghcr.io/${{ steps.registry.outputs.image_org }}/${{ steps.defaults.outputs.image_name }}
           signing_key_filename: ${{ steps.defaults.outputs.image_name }}.pub
 
+      # Candidate publication is separate from promotion. This lets the workflow
+      # test and sign the candidate first, then decide later whether it is safe
+      # to copy that exact digest to the stable tag.
       - name: Push and sign candidate image
         uses: ./.github/actions/publish-native-image
         with:
@@ -145,6 +174,8 @@ jobs:
     needs:
       - build-zfs-akmods
       - build-candidate-image
+    # Manual runs can opt out of promotion so a maintainer can build and inspect
+    # the candidate image without moving the public `latest` tag.
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.promote_to_stable == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -153,6 +184,9 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
+      # Each job starts on a fresh runner, so we load defaults and registry
+      # context again instead of depending on process-local state from earlier
+      # jobs.
       - id: defaults
         name: Load repository defaults
         uses: ./.github/actions/load-ci-defaults
@@ -161,9 +195,13 @@ jobs:
         name: Prepare registry context
         uses: ./.github/actions/prepare-registry-context
 
+      # Promotion and signing need `skopeo` and `cosign`, but the earlier build
+      # jobs do not. Installing them only here keeps the other jobs lighter.
       - name: Install skopeo and cosign
         uses: ./.github/actions/install-signing-tools
 
+      # Promotion copies the already-tested candidate image digest to `latest`
+      # and records audit tags. It does not rebuild the image.
       - name: Promote candidate image to latest and audit tags
         shell: bash
         env:
@@ -174,6 +212,8 @@ jobs:
         run: |
           python3 -m ci_tools.cli promote-stable
 
+      # Sign the stable digest after promotion so consumers of `latest` can
+      # verify the exact image that was promoted.
       - name: Sign promoted stable image digest
         shell: bash
         env:

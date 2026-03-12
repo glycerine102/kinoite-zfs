@@ -29,8 +29,13 @@ outputs:
     value: ${{ steps.defaults.outputs.default_zfs_minor_version }}
 
 runs:
+  # This action turns the checked-in JSON defaults file into normal GitHub
+  # Actions outputs. Keeping the defaults in one tracked file makes changes
+  # reviewable in Git history instead of hiding them in repository settings.
   using: composite
   steps:
+    # The Python helper validates the file shape and exports each value through
+    # GitHub's output mechanism so later steps can read them with a stable name.
     - id: defaults
       shell: bash
       run: |
