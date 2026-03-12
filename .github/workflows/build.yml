@@ -50,22 +50,22 @@ jobs:
     name: Build Shared ZFS Akmods Cache
     runs-on: ubuntu-24.04
     outputs:
-      fedora_version: ${{ steps.resolve.outputs.version }}
-      kernel_release: ${{ steps.resolve.outputs.kernel_release }}
-      kernel_releases: ${{ steps.resolve.outputs.kernel_releases }}
-      base_image_ref: ${{ steps.resolve.outputs.base_image_ref }}
-      base_image_name: ${{ steps.resolve.outputs.base_image_name }}
-      base_image_tag: ${{ steps.resolve.outputs.base_image_tag }}
-      base_image_pinned: ${{ steps.resolve.outputs.base_image_pinned }}
-      base_image_digest: ${{ steps.resolve.outputs.base_image_digest }}
-      build_container_ref: ${{ steps.resolve.outputs.build_container_ref }}
-      build_container_pinned: ${{ steps.resolve.outputs.build_container_pinned }}
-      build_container_digest: ${{ steps.resolve.outputs.build_container_digest }}
-      zfs_minor_version: ${{ steps.resolve.outputs.zfs_minor_version }}
-      akmods_upstream_ref: ${{ steps.resolve.outputs.akmods_upstream_ref }}
-      use_input_lock: ${{ steps.resolve.outputs.use_input_lock }}
-      lock_file_path: ${{ steps.resolve.outputs.lock_file_path }}
-      akmods_cache_exists: ${{ steps.cache.outputs.exists }}
+      fedora_version: ${{ steps.prepare.outputs.version }}
+      kernel_release: ${{ steps.prepare.outputs.kernel_release }}
+      kernel_releases: ${{ steps.prepare.outputs.kernel_releases }}
+      base_image_ref: ${{ steps.prepare.outputs.base_image_ref }}
+      base_image_name: ${{ steps.prepare.outputs.base_image_name }}
+      base_image_tag: ${{ steps.prepare.outputs.base_image_tag }}
+      base_image_pinned: ${{ steps.prepare.outputs.base_image_pinned }}
+      base_image_digest: ${{ steps.prepare.outputs.base_image_digest }}
+      build_container_ref: ${{ steps.prepare.outputs.build_container_ref }}
+      build_container_pinned: ${{ steps.prepare.outputs.build_container_pinned }}
+      build_container_digest: ${{ steps.prepare.outputs.build_container_digest }}
+      zfs_minor_version: ${{ steps.prepare.outputs.zfs_minor_version }}
+      akmods_upstream_ref: ${{ steps.prepare.outputs.akmods_upstream_ref }}
+      use_input_lock: ${{ steps.prepare.outputs.use_input_lock }}
+      lock_file_path: ${{ steps.prepare.outputs.lock_file_path }}
+      akmods_cache_exists: ${{ steps.prepare.outputs.akmods_cache_exists }}
     permissions:
       contents: read
       packages: write
@@ -79,102 +79,18 @@ jobs:
         name: Load repository defaults
         uses: ./.github/actions/load-ci-defaults
 
-      - name: Resolve build inputs for this run
-        id: resolve
-        shell: bash
-        env:
-          USE_INPUT_LOCK: ${{ github.event.inputs.use_input_lock || 'false' }}
-          LOCK_FILE: ${{ github.event.inputs.lock_file || 'ci/inputs.lock.json' }}
-          BUILD_CONTAINER_REF: ${{ github.event.inputs.build_container_image || steps.defaults.outputs.default_build_container_image }}
-        run: |
-          python3 -m ci_tools.cli resolve-build-inputs
-
-      - name: Write build inputs manifest
-        shell: bash
-        env:
-          USE_INPUT_LOCK: ${{ steps.resolve.outputs.use_input_lock }}
-          LOCK_FILE_PATH: ${{ steps.resolve.outputs.lock_file_path }}
-          FEDORA_VERSION: ${{ steps.resolve.outputs.version }}
-          KERNEL_RELEASE: ${{ steps.resolve.outputs.kernel_release }}
-          KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
-          BASE_IMAGE_REF: ${{ steps.resolve.outputs.base_image_ref }}
-          BASE_IMAGE_NAME: ${{ steps.resolve.outputs.base_image_name }}
-          BASE_IMAGE_TAG: ${{ steps.resolve.outputs.base_image_tag }}
-          BASE_IMAGE_PINNED: ${{ steps.resolve.outputs.base_image_pinned }}
-          BASE_IMAGE_DIGEST: ${{ steps.resolve.outputs.base_image_digest }}
-          BUILD_CONTAINER_REF: ${{ steps.resolve.outputs.build_container_ref }}
-          BUILD_CONTAINER_PINNED: ${{ steps.resolve.outputs.build_container_pinned }}
-          BUILD_CONTAINER_DIGEST: ${{ steps.resolve.outputs.build_container_digest }}
-          ZFS_MINOR_VERSION: ${{ steps.resolve.outputs.zfs_minor_version }}
-          AKMODS_UPSTREAM_REF: ${{ steps.resolve.outputs.akmods_upstream_ref }}
-        run: |
-          python3 -m ci_tools.cli write-build-inputs-manifest
-
-      - name: Upload build inputs manifest
-        uses: actions/upload-artifact@v7
+      - name: Resolve inputs, verify cache state, and refresh shared akmods when required
+        id: prepare
+        uses: ./.github/actions/prepare-main-akmods
         with:
-          name: build-inputs-${{ github.run_id }}
-          path: artifacts/build-inputs.json
-          if-no-files-found: error
-
-      - name: Check for existing shared akmods cache
-        id: cache
-        shell: bash
-        env:
-          FEDORA_VERSION: ${{ steps.resolve.outputs.version }}
-          KERNEL_RELEASE: ${{ steps.resolve.outputs.kernel_release }}
-          KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
-          AKMODS_REPO: ${{ steps.defaults.outputs.akmods_repo }}
-        run: |
-          python3 -m ci_tools.cli check-akmods-cache
-
-      - name: Publish metadata sidecar for existing shared akmods cache
-        if: steps.cache.outputs.exists == 'true' && steps.cache.outputs.metadata_exists != 'true'
-        shell: bash
-        env:
-          KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
-          AKMODS_VERSION: ${{ steps.resolve.outputs.version }}
-          AKMODS_KERNEL: main
-          AKMODS_REPO: ${{ steps.defaults.outputs.akmods_repo }}
-          REGISTRY_ACTOR: ${{ github.actor }}
-          REGISTRY_TOKEN: ${{ github.token }}
-        run: |
-          python3 -m ci_tools.cli publish-akmods-cache-metadata
-
-      - name: Clone pinned upstream akmods tooling
-        shell: bash
-        env:
-          AKMODS_UPSTREAM_REPO: ${{ steps.defaults.outputs.akmods_upstream_repo }}
-          AKMODS_UPSTREAM_REF: ${{ steps.resolve.outputs.akmods_upstream_ref }}
-        run: |
-          python3 -m ci_tools.cli akmods-clone-pinned
-
-      - name: Configure shared ZFS target in self-hosted namespace
-        if: github.event_name == 'schedule' || github.event.inputs.rebuild_akmods == 'true' || steps.cache.outputs.exists != 'true'
-        shell: bash
-        env:
-          FEDORA_VERSION: ${{ steps.resolve.outputs.version }}
-          AKMODS_REPO: ${{ steps.defaults.outputs.akmods_repo }}
-          AKMODS_DESCRIPTION: Shared cache image for pre-built zfs akmod RPMs
-        run: |
-          python3 -m ci_tools.cli akmods-configure-zfs-target
-
-      - name: Build and publish shared self-hosted ZFS akmods image
-        if: github.event_name == 'schedule' || github.event.inputs.rebuild_akmods == 'true' || steps.cache.outputs.exists != 'true'
-        shell: bash
-        env:
-          AKMODS_KERNEL: main
-          AKMODS_VERSION: ${{ steps.resolve.outputs.version }}
-          KERNEL_RELEASE: ${{ steps.resolve.outputs.kernel_release }}
-          KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
-          AKMODS_REPO: ${{ steps.defaults.outputs.akmods_repo }}
-          AKMODS_TARGET: zfs
-          ZFS_MINOR_VERSION: ${{ steps.resolve.outputs.zfs_minor_version }}
-          CI: "1"
-          REGISTRY_ACTOR: ${{ github.actor }}
-          REGISTRY_TOKEN: ${{ github.token }}
-        run: |
-          python3 -m ci_tools.cli akmods-build-and-publish
+          use_input_lock: ${{ github.event.inputs.use_input_lock || 'false' }}
+          lock_file: ${{ github.event.inputs.lock_file || 'ci/inputs.lock.json' }}
+          build_container_ref: ${{ github.event.inputs.build_container_image || steps.defaults.outputs.default_build_container_image }}
+          akmods_repo: ${{ steps.defaults.outputs.akmods_repo }}
+          akmods_upstream_repo: ${{ steps.defaults.outputs.akmods_upstream_repo }}
+          rebuild_akmods: ${{ github.event_name == 'schedule' || github.event.inputs.rebuild_akmods == 'true' }}
+          registry_actor: ${{ github.actor }}
+          registry_token: ${{ github.token }}
 
   build-candidate-image:
     name: Build Candidate Image
@@ -200,7 +116,7 @@ jobs:
         env:
           FEDORA_VERSION: ${{ needs.build-zfs-akmods.outputs.fedora_version }}
         run: |
-          echo "candidate_tag=candidate-${GITHUB_SHA::7}-${FEDORA_VERSION}" >> "$GITHUB_OUTPUT"
+          python3 -m ci_tools.cli compute-candidate-tag
 
       - name: Build candidate image locally
         uses: ./.github/actions/build-native-image

@@ -19,17 +19,4 @@ runs:
     - id: context
       shell: bash
       run: |
-        image_org=${GITHUB_REPOSITORY_OWNER,,}
-        image_registry="ghcr.io/${image_org}"
-        actor_is_bot=false
-        if [[ "$GITHUB_ACTOR" == *"[bot]" ]]; then
-          actor_is_bot=true
-        fi
-
-        echo "IMAGE_ORG=${image_org}" >> "$GITHUB_ENV"
-        echo "IMAGE_REGISTRY=${image_registry}" >> "$GITHUB_ENV"
-        echo "ACTOR_IS_BOT=${actor_is_bot}" >> "$GITHUB_ENV"
-
-        echo "image_org=${image_org}" >> "$GITHUB_OUTPUT"
-        echo "image_registry=${image_registry}" >> "$GITHUB_OUTPUT"
-        echo "actor_is_bot=${actor_is_bot}" >> "$GITHUB_OUTPUT"
+        python3 -m ci_tools.cli export-registry-context

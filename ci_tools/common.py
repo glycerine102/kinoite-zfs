@@ -282,13 +282,6 @@ def sort_kernel_releases(kernel_releases: Sequence[str]) -> list[str]:
     return sorted(dict.fromkeys(kernel_releases), key=natural_sort_key)
 
 
-def print_lines_starting_with(file_path: Path, prefix: str) -> None:
-    """Print line-numbered matches, similar to `grep -n '^prefix'`."""
-    for index, line in enumerate(file_path.read_text(encoding="utf-8").splitlines(), start=1):
-        if line.startswith(prefix):
-            print(f"{index}:{line}")
-
-
 def extract_fedora_version(kernel_release: str) -> str:
     """
     Parse Fedora major version (for example `43`) from a kernel release.
@@ -299,17 +292,3 @@ def extract_fedora_version(kernel_release: str) -> str:
     if not match:
         raise CiToolError(f"Failed to extract Fedora version from kernel release {kernel_release}")
     return match.group(1)
-
-
-def replace_line_starting_with(file_path: Path, prefix: str, replacement: str) -> None:
-    """Replace exactly one line that starts with `prefix`."""
-    lines = file_path.read_text(encoding="utf-8").splitlines()
-    changed = False
-    for index, line in enumerate(lines):
-        if line.startswith(prefix):
-            lines[index] = replacement
-            changed = True
-            break
-    if not changed:
-        raise CiToolError(f"Could not find line starting with '{prefix}' in {file_path}")
-    file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

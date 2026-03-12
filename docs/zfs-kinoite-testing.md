@@ -95,7 +95,7 @@ The workflow passes build arguments directly into [`Containerfile`](../Container
 
 1. `BASE_IMAGE`
 2. `BREW_IMAGE`
-3. `AKMODS_IMAGE`
+3. `AKMODS_IMAGE` or `AKMODS_IMAGE_TEMPLATE`
 4. `IMAGE_REPO`
 5. `SIGNING_KEY_FILENAME`
 

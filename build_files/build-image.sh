@@ -13,9 +13,14 @@ set -euo pipefail
 
 # Build-time configuration is passed from the Containerfile as environment
 # variables so the script can stay reusable in GitHub Actions workflow runs and local tests.
-: "${AKMODS_IMAGE:?Missing AKMODS_IMAGE}"
 : "${IMAGE_REPO:?Missing IMAGE_REPO}"
 : "${SIGNING_KEY_FILENAME:?Missing SIGNING_KEY_FILENAME}"
+
+# `install_zfs_from_akmods_cache.py` accepts either:
+# 1. `AKMODS_IMAGE` for an exact override, or
+# 2. `AKMODS_IMAGE_TEMPLATE` for "follow the Fedora version in this base image".
+# CI passes the exact image today, while local builds usually rely on the
+# template path so they do not need a hard-coded Fedora release number here.
 
 # Copy the committed public key into the standard trust-material directory.
 install -d -m 0755 /etc/pki/containers /etc/containers/registries.d
@@ -39,7 +44,7 @@ python3 /containerfiles/zfs-akmods/install_zfs_from_akmods_cache.py
 # host-side repair steps.
 IMAGE_REPO="${IMAGE_REPO}" \
 SIGNING_KEY_FILENAME="${SIGNING_KEY_FILENAME}" \
-/files/scripts/configure-signing-policy.sh
+python3 /files/scripts/configure_signing_policy.py
 
 # `bootc container lint` expects package-created state directories under `/var`
 # to have matching tmpfiles declarations. The `zfs` dependency chain pulls in

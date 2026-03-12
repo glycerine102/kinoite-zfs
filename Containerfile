@@ -17,13 +17,19 @@ FROM ${BREW_IMAGE} AS brew
 FROM ${BASE_IMAGE}
 
 # These build arguments are supplied by CI for each run.
-ARG AKMODS_IMAGE="ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-43"
+#
+# Local builds should not bake in one Fedora major version here. When CI does
+# not pass an explicit akmods image reference, the helper can render this
+# template with the Fedora version detected from the chosen base image.
+ARG AKMODS_IMAGE=""
+ARG AKMODS_IMAGE_TEMPLATE="ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-{fedora}"
 ARG IMAGE_REPO="ghcr.io/danathar/zfs-kinoite-containerfile"
 ARG SIGNING_KEY_FILENAME="zfs-kinoite-containerfile.pub"
 
 # Convert the build arguments into environment variables once so the helper
 # script can read stable names while the Containerfile stays declarative.
 ENV AKMODS_IMAGE="${AKMODS_IMAGE}"
+ENV AKMODS_IMAGE_TEMPLATE="${AKMODS_IMAGE_TEMPLATE}"
 ENV IMAGE_REPO="${IMAGE_REPO}"
 ENV SIGNING_KEY_FILENAME="${SIGNING_KEY_FILENAME}"
 

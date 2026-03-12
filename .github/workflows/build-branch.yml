@@ -65,7 +65,7 @@ jobs:
           BRANCH_TAG_PREFIX: ${{ needs.prepare-branch-metadata.outputs.branch_tag }}
           FEDORA_VERSION: ${{ steps.prepare.outputs.version }}
         run: |
-          echo "branch_image_tag=${BRANCH_TAG_PREFIX}-${FEDORA_VERSION}" >> "$GITHUB_OUTPUT"
+          python3 -m ci_tools.cli compose-branch-image-tag
 
       - name: Build branch image locally
         uses: ./.github/actions/build-native-image

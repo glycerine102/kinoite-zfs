@@ -26,8 +26,11 @@ def command_map() -> dict[str, Callable[[], None]]:
     from ci_tools.akmods_clone_pinned import main as akmods_clone_pinned
     from ci_tools.akmods_configure_zfs_target import main as akmods_configure_zfs_target
     from ci_tools.check_akmods_cache import main as check_akmods_cache
+    from ci_tools.compose_branch_image_tag import main as compose_branch_image_tag
+    from ci_tools.compute_candidate_tag import main as compute_candidate_tag
     from ci_tools.compute_branch_metadata import main as compute_branch_metadata
     from ci_tools.export_repo_defaults import main as export_repo_defaults
+    from ci_tools.export_registry_context import main as export_registry_context
     from ci_tools.publish_akmods_cache_metadata import main as publish_akmods_cache_metadata
     from ci_tools.prepare_validation_build import main as prepare_validation_build
     from ci_tools.promote_stable import main as promote_stable
@@ -39,7 +42,10 @@ def command_map() -> dict[str, Callable[[], None]]:
         "resolve-build-inputs": resolve_build_inputs,
         "write-build-inputs-manifest": write_build_inputs_manifest,
         "check-akmods-cache": check_akmods_cache,
+        "compose-branch-image-tag": compose_branch_image_tag,
+        "compute-candidate-tag": compute_candidate_tag,
         "export-repo-defaults": export_repo_defaults,
+        "export-registry-context": export_registry_context,
         "publish-akmods-cache-metadata": publish_akmods_cache_metadata,
         "prepare-validation-build": prepare_validation_build,
         "compute-branch-metadata": compute_branch_metadata,
