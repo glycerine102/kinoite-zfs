@@ -1,0 +1,62 @@
+name: Publish Native Image
+
+description: Push one locally built image tag to GHCR and optionally sign it.
+
+inputs:
+  image_registry:
+    description: Registry path, for example ghcr.io/danathar.
+    required: true
+  image_name:
+    description: Image name under the registry namespace.
+    required: true
+  image_tag:
+    description: Image tag to push and optionally sign.
+    required: true
+  registry_username:
+    description: Registry username.
+    required: true
+  registry_password:
+    description: Registry password or token.
+    required: true
+  image_org:
+    description: Lowercase registry owner used for signing lookups.
+    required: true
+  cosign_private_key:
+    description: Private signing key. Leave empty to skip signing.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
+      with:
+        registry: ghcr.io
+        username: ${{ inputs.registry_username }}
+        password: ${{ inputs.registry_password }}
+
+    - uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c
+      env:
+        REGISTRY_USER: ${{ inputs.registry_username }}
+        REGISTRY_PASSWORD: ${{ inputs.registry_password }}
+      with:
+        registry: ${{ inputs.image_registry }}
+        image: ${{ inputs.image_name }}
+        tags: ${{ inputs.image_tag }}
+        username: ${{ env.REGISTRY_USER }}
+        password: ${{ env.REGISTRY_PASSWORD }}
+
+    - if: inputs.cosign_private_key != ''
+      uses: ./.github/actions/install-signing-tools
+
+    - if: inputs.cosign_private_key != ''
+      shell: bash
+      env:
+        IMAGE_ORG: ${{ inputs.image_org }}
+        IMAGE_NAME: ${{ inputs.image_name }}
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        REGISTRY_ACTOR: ${{ inputs.registry_username }}
+        REGISTRY_TOKEN: ${{ inputs.registry_password }}
+        COSIGN_PRIVATE_KEY: ${{ inputs.cosign_private_key }}
+      run: |
+        python3 -m ci_tools.cli sign-image

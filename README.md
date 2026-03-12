@@ -47,10 +47,11 @@ So the `main` workflow does this:
 
 1. resolve and pin the exact base image, kernel set, builder image, and ZFS line for the run
 2. reuse or rebuild the shared akmods cache image for that exact kernel set
-3. build a candidate image tag in the same repository
-4. sign that candidate digest
-5. promote the tested candidate digest to `latest` and to an immutable audit tag
-6. sign the promoted `latest` digest
+3. publish or repair a tiny metadata sidecar tag that records which kernels that shared cache covers
+4. build a candidate image tag in the same repository
+5. sign that candidate digest
+6. promote the tested candidate digest to `latest` and to an immutable audit tag
+7. sign the promoted `latest` digest
 
 If candidate fails, `latest` does not move.
 
@@ -62,11 +63,13 @@ OS image tags in one repository:
 - stable image: `ghcr.io/danathar/zfs-kinoite-containerfile:latest`
 - stable audit tag: `ghcr.io/danathar/zfs-kinoite-containerfile:stable-<run>-<sha>`
 - branch test image: `ghcr.io/danathar/zfs-kinoite-containerfile:br-<branch>-<fedora>`
+  - bot-authored branch runs validate locally but intentionally do not push this tag
 
 Shared akmods cache image:
 
 - `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>`
 - architecture-specific inspection tag: `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>-x86_64`
+- metadata sidecar tag: `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>-metadata`
 
 The important simplification is this:
 
@@ -80,8 +83,10 @@ The important simplification is this:
 Containerfile                         native image build definition
 build_files/build-image.sh            build-time orchestration inside the image
 containerfiles/zfs-akmods/            compose-time ZFS install helper
+ci/defaults.json                      checked-in defaults shared by workflows and helpers
 files/scripts/                        image-local helper scripts
 ci_tools/                             workflow helper commands
+.github/actions/                      local composite actions used by the workflows
 .github/workflows/                    GitHub Actions pipelines
 .github/scripts/README.md             workflow step -> CLI command map
 docs/                                 teaching-style documentation
@@ -109,6 +114,11 @@ At a high level, the final image build now works like this:
 2. `COPY --from=ghcr.io/ublue-os/brew:latest /system_files /` imports the official brew payload
 3. `build_files/build-image.sh` enables the brew services/timers, installs `distrobox`, installs ZFS RPMs from the shared akmods cache image, writes signing policy, and commits the ostree container
 4. `bootc container lint` validates the final image
+
+Two CI-side simplifications now support that image build:
+
+1. `ci/defaults.json` is the one checked-in source of truth for default image refs, image names, and the pinned akmods fork commit
+2. the shared akmods cache publishes a `main-<fedora>-metadata` sidecar tag so later validation runs can usually answer cache-reuse questions from registry metadata alone
 
 The ZFS install step still has one important workaround:
 

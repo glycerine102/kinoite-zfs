@@ -30,11 +30,13 @@ The objective is to validate that we can safely:
 2. stable OS image: `ghcr.io/danathar/zfs-kinoite-containerfile:latest`
 3. stable audit tag: `ghcr.io/danathar/zfs-kinoite-containerfile:stable-<run>-<sha>`
 4. shared akmods cache image: `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>`
+5. shared akmods cache metadata sidecar: `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>-metadata`
 
 ### Branch Artifacts
 
-1. branch image: `ghcr.io/danathar/zfs-kinoite-containerfile:br-<branch>-<fedora>`
-2. shared akmods cache stays the same shared source image; branch builds do not publish branch-specific cache tags
+1. human-authored branch image: `ghcr.io/danathar/zfs-kinoite-containerfile:br-<branch>-<fedora>`
+2. bot-authored branch runs stop after local validation and do not push any public tag
+3. shared akmods cache stays the same shared source image; branch builds do not publish branch-specific cache tags
 
 ## End-To-End Build Flow
 
@@ -51,6 +53,11 @@ After resolving the base image, the workflow inspects `/lib/modules` inside the 
 
 Before rebuilding akmods, CI checks whether the shared cache image already contains a matching `kmod-zfs-<kernel_release>` RPM for every base-image kernel.
 
+That check now prefers the metadata sidecar first:
+
+1. inspect `main-<fedora>-metadata` and read its cached kernel-release label
+2. only if that sidecar tag is missing or malformed, unpack the full shared cache image and inspect the RPM filenames directly
+
 If any kernel is missing, rebuild is forced.
 
 ### 3. Build Shared Akmods Cache When Required
@@ -62,6 +69,7 @@ If cache is missing/stale (or manual rebuild is requested), CI:
 3. seeds cache metadata for every detected kernel
 4. builds kernel-specific payloads when needed
 5. merges those payloads into one shared Fedora-wide cache image
+6. publishes the `main-<fedora>-metadata` sidecar tag for future fast-path reuse checks
 
 ### 4. Build Candidate Or Branch Image
 
@@ -86,6 +94,11 @@ This keeps signature behavior consistent for:
 1. candidate tags
 2. branch tags
 3. stable `latest`
+
+Branch note:
+
+- only human-authored branch runs push/sign branch tags
+- bot actors such as Dependabot still run the build, but they stop before GHCR push/signing so the registry does not fill with unsigned automation artifacts
 
 ### 6. Promote Candidate To Stable
 

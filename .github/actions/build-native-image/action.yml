@@ -1,0 +1,43 @@
+name: Build Native Image
+
+description: Build the native Kinoite image with the standard OCI build arguments used by this repository.
+
+inputs:
+  image_name:
+    description: Local image name to hand to buildah.
+    required: true
+  image_tag:
+    description: Local image tag to build.
+    required: true
+  base_image:
+    description: Digest-pinned base image ref.
+    required: true
+  brew_image:
+    description: Brew OCI image ref copied into the final image.
+    required: true
+  akmods_image:
+    description: Shared akmods cache image ref.
+    required: true
+  image_repo:
+    description: Public image repository path used by in-image signing policy.
+    required: true
+  signing_key_filename:
+    description: Public key filename installed inside the image.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056
+      with:
+        containerfiles: |
+          ./Containerfile
+        image: ${{ inputs.image_name }}
+        tags: ${{ inputs.image_tag }}
+        build-args: |
+          BASE_IMAGE=${{ inputs.base_image }}
+          BREW_IMAGE=${{ inputs.brew_image }}
+          AKMODS_IMAGE=${{ inputs.akmods_image }}
+          IMAGE_REPO=${{ inputs.image_repo }}
+          SIGNING_KEY_FILENAME=${{ inputs.signing_key_filename }}
+        oci: false

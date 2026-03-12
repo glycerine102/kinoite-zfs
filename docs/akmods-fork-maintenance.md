@@ -9,8 +9,8 @@ This page explains how to maintain the pinned upstream akmods fork reference use
 
 Current control points:
 
-- workflow env `AKMODS_UPSTREAM_REPO`
-- workflow env `AKMODS_UPSTREAM_REF`
+- checked-in defaults file [`ci/defaults.json`](../ci/defaults.json)
+- workflow/manual env overrides when you need one-off validation
 
 ## Why The Pin Exists
 
@@ -26,7 +26,7 @@ Why:
 
 1. inspect the current state of `Danathar/akmods`
 2. choose the exact commit you want to test
-3. update `AKMODS_UPSTREAM_REF` in all workflow files that define defaults
+3. update `AKMODS_UPSTREAM_REF` in [`ci/defaults.json`](../ci/defaults.json)
 4. run branch or manual validation first if the change is risky
 5. merge only after `main` builds and signs successfully
 
@@ -47,3 +47,13 @@ Why:
 
 If a new akmods pin breaks the build, revert the pin first.
 Do not start patching unrelated workflow code until you know the akmods change is really required.
+
+## Important Current Assumption
+
+This repository no longer patches the cloned akmods `Justfile` at runtime.
+
+That means:
+
+1. if this repo needs repo-specific publish-name behavior, that logic must exist in the pinned `Danathar/akmods` commit itself
+2. the clone step here is intentionally boring on purpose: clone, detach, verify SHA, stop
+3. if a future akmods change breaks repo-specific publishing, fix the fork and repin it instead of reintroducing a local patch layer

@@ -45,16 +45,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 
-env:
-  AKMODS_UPSTREAM_REPO: https://github.com/Danathar/akmods.git
-  AKMODS_UPSTREAM_REF: 9d13b6950811cdaae2e8ab748c85c5da35810ae3
-  IMAGE_NAME: zfs-kinoite-containerfile
-  AKMODS_REPO: zfs-kinoite-containerfile-akmods
-  DEFAULT_BASE_IMAGE: ghcr.io/ublue-os/kinoite-main:latest
-  DEFAULT_BUILD_CONTAINER_IMAGE: ghcr.io/ublue-os/devcontainer:latest
-  DEFAULT_BREW_IMAGE: ghcr.io/ublue-os/brew:latest
-  DEFAULT_ZFS_MINOR_VERSION: "2.4"
-
 jobs:
   build-zfs-akmods:
     name: Build Shared ZFS Akmods Cache
@@ -85,16 +75,17 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
+      - id: defaults
+        name: Load repository defaults
+        uses: ./.github/actions/load-ci-defaults
+
       - name: Resolve build inputs for this run
         id: resolve
         shell: bash
         env:
           USE_INPUT_LOCK: ${{ github.event.inputs.use_input_lock || 'false' }}
           LOCK_FILE: ${{ github.event.inputs.lock_file || 'ci/inputs.lock.json' }}
-          BUILD_CONTAINER_REF: ${{ github.event.inputs.build_container_image || env.DEFAULT_BUILD_CONTAINER_IMAGE }}
-          DEFAULT_BASE_IMAGE: ${{ env.DEFAULT_BASE_IMAGE }}
-          DEFAULT_ZFS_MINOR_VERSION: ${{ env.DEFAULT_ZFS_MINOR_VERSION }}
-          DEFAULT_AKMODS_REF: ${{ env.AKMODS_UPSTREAM_REF }}
+          BUILD_CONTAINER_REF: ${{ github.event.inputs.build_container_image || steps.defaults.outputs.default_build_container_image }}
         run: |
           python3 -m ci_tools.cli resolve-build-inputs
 
@@ -133,15 +124,28 @@ jobs:
           FEDORA_VERSION: ${{ steps.resolve.outputs.version }}
           KERNEL_RELEASE: ${{ steps.resolve.outputs.kernel_release }}
           KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
-          AKMODS_REPO: ${{ env.AKMODS_REPO }}
+          AKMODS_REPO: ${{ steps.defaults.outputs.akmods_repo }}
         run: |
           python3 -m ci_tools.cli check-akmods-cache
+
+      - name: Publish metadata sidecar for existing shared akmods cache
+        if: steps.cache.outputs.exists == 'true' && steps.cache.outputs.metadata_exists != 'true'
+        shell: bash
+        env:
+          KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
+          AKMODS_VERSION: ${{ steps.resolve.outputs.version }}
+          AKMODS_KERNEL: main
+          AKMODS_REPO: ${{ steps.defaults.outputs.akmods_repo }}
+          REGISTRY_ACTOR: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m ci_tools.cli publish-akmods-cache-metadata
 
       - name: Clone upstream akmods tooling
         if: github.event_name == 'schedule' || github.event.inputs.rebuild_akmods == 'true' || steps.cache.outputs.exists != 'true'
         shell: bash
         env:
-          AKMODS_UPSTREAM_REPO: ${{ env.AKMODS_UPSTREAM_REPO }}
+          AKMODS_UPSTREAM_REPO: ${{ steps.defaults.outputs.akmods_upstream_repo }}
           AKMODS_UPSTREAM_REF: ${{ steps.resolve.outputs.akmods_upstream_ref }}
         run: |
           python3 -m ci_tools.cli akmods-clone-pinned
@@ -151,7 +155,7 @@ jobs:
         shell: bash
         env:
           FEDORA_VERSION: ${{ steps.resolve.outputs.version }}
-          AKMODS_REPO: ${{ env.AKMODS_REPO }}
+          AKMODS_REPO: ${{ steps.defaults.outputs.akmods_repo }}
           AKMODS_DESCRIPTION: Shared cache image for pre-built zfs akmod RPMs
         run: |
           python3 -m ci_tools.cli akmods-configure-zfs-target
@@ -164,7 +168,7 @@ jobs:
           AKMODS_VERSION: ${{ steps.resolve.outputs.version }}
           KERNEL_RELEASE: ${{ steps.resolve.outputs.kernel_release }}
           KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
-          AKMODS_REPO: ${{ env.AKMODS_REPO }}
+          AKMODS_REPO: ${{ steps.defaults.outputs.akmods_repo }}
           AKMODS_TARGET: zfs
           ZFS_MINOR_VERSION: ${{ steps.resolve.outputs.zfs_minor_version }}
           CI: "1"
@@ -183,11 +187,13 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Prepare lowercase registry paths
-        shell: bash
-        run: |
-          echo "IMAGE_ORG=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
-          echo "IMAGE_REGISTRY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - id: defaults
+        name: Load repository defaults
+        uses: ./.github/actions/load-ci-defaults
+
+      - id: registry
+        name: Prepare registry context
+        uses: ./.github/actions/prepare-registry-context
 
       - name: Compute candidate tag
         id: tags
@@ -198,60 +204,26 @@ jobs:
           echo "candidate_tag=candidate-${GITHUB_SHA::7}-${FEDORA_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build candidate image locally
-        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056
+        uses: ./.github/actions/build-native-image
         with:
-          containerfiles: |
-            ./Containerfile
-          image: ${{ env.IMAGE_NAME }}
-          tags: ${{ steps.tags.outputs.candidate_tag }}
-          build-args: |
-            BASE_IMAGE=${{ needs.build-zfs-akmods.outputs.base_image_pinned }}
-            BREW_IMAGE=${{ env.DEFAULT_BREW_IMAGE }}
-            AKMODS_IMAGE=ghcr.io/${{ env.IMAGE_ORG }}/${{ env.AKMODS_REPO }}:main-${{ needs.build-zfs-akmods.outputs.fedora_version }}
-            IMAGE_REPO=ghcr.io/${{ env.IMAGE_ORG }}/${{ env.IMAGE_NAME }}
-            SIGNING_KEY_FILENAME=${{ env.IMAGE_NAME }}.pub
-          oci: false
+          image_name: ${{ steps.defaults.outputs.image_name }}
+          image_tag: ${{ steps.tags.outputs.candidate_tag }}
+          base_image: ${{ needs.build-zfs-akmods.outputs.base_image_pinned }}
+          brew_image: ${{ steps.defaults.outputs.default_brew_image }}
+          akmods_image: ghcr.io/${{ steps.registry.outputs.image_org }}/${{ steps.defaults.outputs.akmods_repo }}:main-${{ needs.build-zfs-akmods.outputs.fedora_version }}
+          image_repo: ghcr.io/${{ steps.registry.outputs.image_org }}/${{ steps.defaults.outputs.image_name }}
+          signing_key_filename: ${{ steps.defaults.outputs.image_name }}.pub
 
-      - name: Log in to GHCR
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
+      - name: Push and sign candidate image
+        uses: ./.github/actions/publish-native-image
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Push candidate image to GHCR
-        uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c
-        env:
-          REGISTRY_USER: ${{ github.actor }}
-          REGISTRY_PASSWORD: ${{ github.token }}
-        with:
-          registry: ${{ env.IMAGE_REGISTRY }}
-          image: ${{ env.IMAGE_NAME }}
-          tags: ${{ steps.tags.outputs.candidate_tag }}
-          username: ${{ env.REGISTRY_USER }}
-          password: ${{ env.REGISTRY_PASSWORD }}
-
-      - name: Install skopeo and cosign for signature upload
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
-        
-      - uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22
-        with:
-          cosign-release: v2.6.1
-
-      - name: Sign candidate image digest
-        shell: bash
-        env:
-          IMAGE_ORG: ${{ env.IMAGE_ORG }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_TAG: ${{ steps.tags.outputs.candidate_tag }}
-          REGISTRY_ACTOR: ${{ github.actor }}
-          REGISTRY_TOKEN: ${{ github.token }}
-          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
-        run: |
-          python3 -m ci_tools.cli sign-image
+          image_registry: ${{ steps.registry.outputs.image_registry }}
+          image_name: ${{ steps.defaults.outputs.image_name }}
+          image_tag: ${{ steps.tags.outputs.candidate_tag }}
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ github.token }}
+          image_org: ${{ steps.registry.outputs.image_org }}
+          cosign_private_key: ${{ secrets.SIGNING_SECRET }}
 
   promote-stable:
     name: Promote Candidate To Stable
@@ -266,20 +238,16 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Prepare lowercase registry paths
-        shell: bash
-        run: |
-          echo "IMAGE_ORG=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - id: defaults
+        name: Load repository defaults
+        uses: ./.github/actions/load-ci-defaults
+
+      - id: registry
+        name: Prepare registry context
+        uses: ./.github/actions/prepare-registry-context
 
       - name: Install skopeo and cosign
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
-
-      - uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22
-        with:
-          cosign-release: v2.6.1
+        uses: ./.github/actions/install-signing-tools
 
       - name: Promote candidate image to latest and audit tags
         shell: bash
@@ -287,15 +255,15 @@ jobs:
           REGISTRY_ACTOR: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ github.token }}
           FEDORA_VERSION: ${{ needs.build-zfs-akmods.outputs.fedora_version }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          IMAGE_NAME: ${{ steps.defaults.outputs.image_name }}
         run: |
           python3 -m ci_tools.cli promote-stable
 
       - name: Sign promoted stable image digest
         shell: bash
         env:
-          IMAGE_ORG: ${{ env.IMAGE_ORG }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          IMAGE_ORG: ${{ steps.registry.outputs.image_org }}
+          IMAGE_NAME: ${{ steps.defaults.outputs.image_name }}
           IMAGE_TAG: latest
           REGISTRY_ACTOR: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ github.token }}

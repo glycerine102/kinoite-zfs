@@ -19,6 +19,7 @@ from ci_tools.common import (
     extract_fedora_version,
     optional_env,
     require_env,
+    require_env_or_default,
     run_cmd,
     skopeo_inspect_digest,
     skopeo_inspect_json,
@@ -204,6 +205,9 @@ def resolve_build_inputs() -> BuildInputResolution:
     use_input_lock = optional_env("USE_INPUT_LOCK", "false").lower() == "true"
     lock_file_path = require_env("LOCK_FILE")
     build_container_ref = require_env("BUILD_CONTAINER_REF")
+    default_akmods_ref = optional_env("DEFAULT_AKMODS_REF") or require_env_or_default(
+        "AKMODS_UPSTREAM_REF"
+    )
 
     if use_input_lock:
         # Replay mode: load values from `ci/inputs.lock.json` (or another lock file).
@@ -231,14 +235,14 @@ def resolve_build_inputs() -> BuildInputResolution:
 
         # Lock files can leave some fields empty; default them when missing.
         if not zfs_minor_version:
-            zfs_minor_version = require_env("DEFAULT_ZFS_MINOR_VERSION")
+            zfs_minor_version = require_env_or_default("DEFAULT_ZFS_MINOR_VERSION")
         if not akmods_upstream_ref:
-            akmods_upstream_ref = require_env("DEFAULT_AKMODS_REF")
+            akmods_upstream_ref = default_akmods_ref
     else:
         # Normal mode: resolve from configured defaults (moving tags).
-        base_image_ref = require_env("DEFAULT_BASE_IMAGE")
-        zfs_minor_version = require_env("DEFAULT_ZFS_MINOR_VERSION")
-        akmods_upstream_ref = require_env("DEFAULT_AKMODS_REF")
+        base_image_ref = require_env_or_default("DEFAULT_BASE_IMAGE")
+        zfs_minor_version = require_env_or_default("DEFAULT_ZFS_MINOR_VERSION")
+        akmods_upstream_ref = default_akmods_ref
 
     # Read base image metadata from registry.
     # Labels carry kernel information and stream version information.

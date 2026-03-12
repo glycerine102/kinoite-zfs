@@ -1,0 +1,37 @@
+name: Load CI Defaults
+
+description: Load checked-in workflow defaults from ci/defaults.json.
+
+outputs:
+  akmods_upstream_repo:
+    description: Pinned akmods fork repository URL.
+    value: ${{ steps.defaults.outputs.akmods_upstream_repo }}
+  akmods_upstream_ref:
+    description: Pinned akmods fork commit.
+    value: ${{ steps.defaults.outputs.akmods_upstream_ref }}
+  image_name:
+    description: Final image repository name.
+    value: ${{ steps.defaults.outputs.image_name }}
+  akmods_repo:
+    description: Shared akmods cache repository name.
+    value: ${{ steps.defaults.outputs.akmods_repo }}
+  default_base_image:
+    description: Default floating base image ref.
+    value: ${{ steps.defaults.outputs.default_base_image }}
+  default_build_container_image:
+    description: Default build container ref.
+    value: ${{ steps.defaults.outputs.default_build_container_image }}
+  default_brew_image:
+    description: Default brew OCI image ref.
+    value: ${{ steps.defaults.outputs.default_brew_image }}
+  default_zfs_minor_version:
+    description: Default OpenZFS minor line.
+    value: ${{ steps.defaults.outputs.default_zfs_minor_version }}
+
+runs:
+  using: composite
+  steps:
+    - id: defaults
+      shell: bash
+      run: |
+        python3 -m ci_tools.cli export-repo-defaults

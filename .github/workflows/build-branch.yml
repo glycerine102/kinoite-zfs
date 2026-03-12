@@ -15,17 +15,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 
-env:
-  AKMODS_UPSTREAM_REPO: https://github.com/Danathar/akmods.git
-  AKMODS_UPSTREAM_REF: 9d13b6950811cdaae2e8ab748c85c5da35810ae3
-  IMAGE_NAME: zfs-kinoite-containerfile
-  AKMODS_REPO: zfs-kinoite-containerfile-akmods
-  DEFAULT_BASE_IMAGE: ghcr.io/ublue-os/kinoite-main:latest
-  DEFAULT_BUILD_CONTAINER_IMAGE: ghcr.io/ublue-os/devcontainer:latest
-  DEFAULT_BREW_IMAGE: ghcr.io/ublue-os/brew:latest
-  DEFAULT_ZFS_MINOR_VERSION: "2.4"
-  HAS_SIGNING_SECRET: ${{ secrets.SIGNING_SECRET != '' }}
-
 jobs:
   prepare-branch-metadata:
     name: Compute Branch Tag
@@ -50,11 +39,13 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Prepare lowercase registry paths
-        shell: bash
-        run: |
-          echo "IMAGE_ORG=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
-          echo "IMAGE_REGISTRY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - id: defaults
+        name: Load repository defaults
+        uses: ./.github/actions/load-ci-defaults
+
+      - id: registry
+        name: Prepare registry context
+        uses: ./.github/actions/prepare-registry-context
 
       - name: Resolve inputs and verify shared akmods cache
         id: prepare
@@ -62,11 +53,8 @@ jobs:
         env:
           USE_INPUT_LOCK: false
           LOCK_FILE: ci/inputs.lock.json
-          BUILD_CONTAINER_REF: ${{ env.DEFAULT_BUILD_CONTAINER_IMAGE }}
-          DEFAULT_BASE_IMAGE: ${{ env.DEFAULT_BASE_IMAGE }}
-          DEFAULT_ZFS_MINOR_VERSION: ${{ env.DEFAULT_ZFS_MINOR_VERSION }}
-          DEFAULT_AKMODS_REF: ${{ env.AKMODS_UPSTREAM_REF }}
-          AKMODS_REPO: ${{ env.AKMODS_REPO }}
+          BUILD_CONTAINER_REF: ${{ steps.defaults.outputs.default_build_container_image }}
+          AKMODS_REPO: ${{ steps.defaults.outputs.akmods_repo }}
         run: |
           python3 -m ci_tools.cli prepare-validation-build
 
@@ -80,60 +68,30 @@ jobs:
           echo "branch_image_tag=${BRANCH_TAG_PREFIX}-${FEDORA_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build branch image locally
-        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056
+        uses: ./.github/actions/build-native-image
         with:
-          containerfiles: |
-            ./Containerfile
-          image: ${{ env.IMAGE_NAME }}
-          tags: ${{ steps.tags.outputs.branch_image_tag }}
-          build-args: |
-            BASE_IMAGE=${{ steps.prepare.outputs.base_image_pinned }}
-            BREW_IMAGE=${{ env.DEFAULT_BREW_IMAGE }}
-            AKMODS_IMAGE=ghcr.io/${{ env.IMAGE_ORG }}/${{ env.AKMODS_REPO }}:main-${{ steps.prepare.outputs.version }}
-            IMAGE_REPO=ghcr.io/${{ env.IMAGE_ORG }}/${{ env.IMAGE_NAME }}
-            SIGNING_KEY_FILENAME=${{ env.IMAGE_NAME }}.pub
-          oci: false
+          image_name: ${{ steps.defaults.outputs.image_name }}
+          image_tag: ${{ steps.tags.outputs.branch_image_tag }}
+          base_image: ${{ steps.prepare.outputs.base_image_pinned }}
+          brew_image: ${{ steps.defaults.outputs.default_brew_image }}
+          akmods_image: ghcr.io/${{ steps.registry.outputs.image_org }}/${{ steps.defaults.outputs.akmods_repo }}:main-${{ steps.prepare.outputs.version }}
+          image_repo: ghcr.io/${{ steps.registry.outputs.image_org }}/${{ steps.defaults.outputs.image_name }}
+          signing_key_filename: ${{ steps.defaults.outputs.image_name }}.pub
 
-      - name: Log in to GHCR
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
+      - name: Push and sign branch image
+        if: steps.registry.outputs.actor_is_bot != 'true'
+        uses: ./.github/actions/publish-native-image
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
+          image_registry: ${{ steps.registry.outputs.image_registry }}
+          image_name: ${{ steps.defaults.outputs.image_name }}
+          image_tag: ${{ steps.tags.outputs.branch_image_tag }}
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ github.token }}
+          image_org: ${{ steps.registry.outputs.image_org }}
+          cosign_private_key: ${{ secrets.SIGNING_SECRET }}
 
-      - name: Push branch image to GHCR
-        uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c
-        env:
-          REGISTRY_USER: ${{ github.actor }}
-          REGISTRY_PASSWORD: ${{ github.token }}
-        with:
-          registry: ${{ env.IMAGE_REGISTRY }}
-          image: ${{ env.IMAGE_NAME }}
-          tags: ${{ steps.tags.outputs.branch_image_tag }}
-          username: ${{ env.REGISTRY_USER }}
-          password: ${{ env.REGISTRY_PASSWORD }}
-
-      - name: Install skopeo and cosign for signature upload
-        if: env.HAS_SIGNING_SECRET == 'true'
+      - name: Explain skipped branch publish for bot actor
+        if: steps.registry.outputs.actor_is_bot == 'true'
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
-
-      - uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22
-        if: env.HAS_SIGNING_SECRET == 'true'
-        with:
-          cosign-release: v2.6.1
-
-      - name: Sign branch image digest
-        if: env.HAS_SIGNING_SECRET == 'true'
-        shell: bash
-        env:
-          IMAGE_ORG: ${{ env.IMAGE_ORG }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_TAG: ${{ steps.tags.outputs.branch_image_tag }}
-          REGISTRY_ACTOR: ${{ github.actor }}
-          REGISTRY_TOKEN: ${{ github.token }}
-          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
-        run: |
-          python3 -m ci_tools.cli sign-image
+          echo "Actor ${GITHUB_ACTOR} is a bot account, so this workflow validated the branch image locally but did not push or sign it."

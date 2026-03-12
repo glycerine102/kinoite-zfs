@@ -72,6 +72,13 @@ Those values are written to a `build-inputs-<run_id>` artifact for replay.
 The workflow checks whether the shared cache image already contains a matching
 `kmod-zfs-<kernel_release>-...rpm` for every kernel shipped in the base image.
 
+That check now has two layers:
+
+1. first inspect `main-<fedora>-metadata`, a tiny sidecar tag that only carries
+   labels listing the covered kernel releases
+2. if that sidecar tag is missing or malformed, fall back to unpacking the full
+   shared cache image and checking the RPM filenames directly
+
 If yes:
 
 - reuse the cache
@@ -79,10 +86,17 @@ If yes:
 If no:
 
 1. clone the pinned `Danathar/akmods` fork
-2. patch its upstream `Justfile` so publish names come from `images.yaml`
-3. point its target output to `ghcr.io/<owner>/zfs-kinoite-containerfile-akmods`
-4. build per-kernel payloads when more than one kernel is present
-5. merge those payloads into one shared Fedora-wide cache image
+2. point its target output to `ghcr.io/<owner>/zfs-kinoite-containerfile-akmods`
+3. build per-kernel payloads when more than one kernel is present
+4. merge those payloads into one shared Fedora-wide cache image
+5. publish the matching `main-<fedora>-metadata` sidecar tag
+
+Important design change:
+
+- this repo no longer patches the cloned akmods `Justfile` at runtime
+- the repo-specific publish-name logic now lives in the pinned `Danathar/akmods`
+  fork commit itself
+- that keeps the runtime clone step boring: clone, detach, verify SHA, stop
 
 ### 3. Native Final Image Build
 
@@ -142,7 +156,8 @@ Because candidate and stable tags are in the same repository, the trust model is
 
 1. `build.yml`: candidate-first build and promotion
 2. `build-branch.yml`: read-only validation inputs plus branch-tagged push
-   - signs the branch image only when `SIGNING_SECRET` is available to that run
+   - bot-authored branch runs still build locally but intentionally skip push and signing
+   - human-authored branch runs push/sign normally
 3. `build-pr.yml`: read-only validation inputs plus no-push build
 
 ## Design Principles
@@ -152,3 +167,11 @@ Because candidate and stable tags are in the same repository, the trust model is
 3. keep the shared akmods cache explicit and inspectable
 4. pin run inputs so `latest` drift does not change behavior mid-run
 5. keep the hard multi-kernel logic in Python, not inline workflow shell
+6. keep workflow defaults in one checked-in file instead of copying them across YAML files
+
+One unavoidable exception exists:
+
+- GitHub resolves `jobs.<job>.container.image` before any step can run
+- because of that, the akmods job in `build.yml` still carries one literal
+  fallback build-container ref next to the checked-in defaults file
+- every later step reads the checked-in defaults instead of repeating them

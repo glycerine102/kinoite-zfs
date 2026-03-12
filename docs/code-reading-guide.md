@@ -12,6 +12,7 @@ If a term is unfamiliar, check the shared glossary first:
 ### 2. Command map and CLI
 
 - [`.github/scripts/README.md`](../.github/scripts/README.md)
+- [`ci/defaults.json`](../ci/defaults.json)
 - [`ci_tools/cli.py`](../ci_tools/cli.py)
 
 ### 3. Input resolution and cache checks
@@ -20,13 +21,15 @@ If a term is unfamiliar, check the shared glossary first:
 2. [`ci_tools/write_build_inputs_manifest.py`](../ci_tools/write_build_inputs_manifest.py)
 3. [`ci_tools/check_akmods_cache.py`](../ci_tools/check_akmods_cache.py)
 4. [`ci_tools/prepare_validation_build.py`](../ci_tools/prepare_validation_build.py)
+5. [`ci_tools/akmods_cache_metadata.py`](../ci_tools/akmods_cache_metadata.py)
 
 ### 4. Akmods build control
 
 1. [`ci_tools/akmods_clone_pinned.py`](../ci_tools/akmods_clone_pinned.py)
-   - clones the pinned upstream fork and patches its `Justfile` publish-name rule
+   - clones the pinned upstream fork and verifies the exact SHA
 2. [`ci_tools/akmods_configure_zfs_target.py`](../ci_tools/akmods_configure_zfs_target.py)
 3. [`ci_tools/akmods_build_and_publish.py`](../ci_tools/akmods_build_and_publish.py)
+4. [`ci_tools/publish_akmods_cache_metadata.py`](../ci_tools/publish_akmods_cache_metadata.py)
 
 ### 5. Native image composition
 
@@ -41,6 +44,8 @@ If a term is unfamiliar, check the shared glossary first:
 2. [`ci_tools/promote_stable.py`](../ci_tools/promote_stable.py)
 3. [`ci_tools/sign_image.py`](../ci_tools/sign_image.py)
    - used by branch/main publish flows when the signing secret is present
+4. [`.github/actions/`](../.github/actions)
+   - local composite actions used to keep workflow YAML readable
 
 ### 7. Tests
 

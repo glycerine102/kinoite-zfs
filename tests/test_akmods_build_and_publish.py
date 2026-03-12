@@ -160,7 +160,18 @@ class AkmodsBuildAndPublishTests(unittest.TestCase):
                 ):
                     with patch.object(script, "build_and_push_kernel_release") as build_release:
                         with patch.object(script, "run_cmd") as run_cmd:
-                            script.main()
+                            with patch.object(script, "publish_shared_cache_metadata") as publish_metadata:
+                                with patch.dict(
+                                    script.os.environ,
+                                    {
+                                        "GITHUB_REPOSITORY_OWNER": "Danathar",
+                                        "AKMODS_REPO": "zfs-kinoite-containerfile-akmods",
+                                        "AKMODS_KERNEL": "main",
+                                        "AKMODS_VERSION": "43",
+                                    },
+                                    clear=False,
+                                ):
+                                    script.main()
 
         build_release.assert_called_once_with(
             "6.18.16-200.fc43.x86_64",
@@ -172,6 +183,13 @@ class AkmodsBuildAndPublishTests(unittest.TestCase):
                 call(["just", "login"], cwd=str(Path(tempdir)), capture_output=False),
                 call(["just", "manifest"], cwd=str(Path(tempdir)), capture_output=False),
             ],
+        )
+        publish_metadata.assert_called_once_with(
+            image_org="danathar",
+            akmods_repo="zfs-kinoite-containerfile-akmods",
+            kernel_flavor="main",
+            akmods_version="43",
+            kernel_releases=["6.18.16-200.fc43.x86_64"],
         )
 
     def test_merge_and_push_shared_cache_image_builds_shared_tags(self) -> None:
@@ -211,16 +229,17 @@ class AkmodsBuildAndPublishTests(unittest.TestCase):
             clear=False,
         ):
             with patch.object(script, "skopeo_copy") as skopeo_copy:
-                with patch.object(
-                    script,
-                    "load_layer_files_from_oci_layout",
-                    return_value=[Path("layer.tar")],
-                ):
-                    with patch.object(script, "unpack_layer_tarballs", side_effect=fake_unpack):
-                        with patch.object(script, "run_cmd", side_effect=fake_run_cmd) as run_cmd:
-                            script.merge_and_push_shared_cache_image(
-                                kernel_releases=kernel_releases
-                            )
+                with patch.object(script, "publish_shared_cache_metadata") as publish_metadata:
+                    with patch.object(
+                        script,
+                        "load_layer_files_from_oci_layout",
+                        return_value=[Path("layer.tar")],
+                    ):
+                        with patch.object(script, "unpack_layer_tarballs", side_effect=fake_unpack):
+                            with patch.object(script, "run_cmd", side_effect=fake_run_cmd) as run_cmd:
+                                script.merge_and_push_shared_cache_image(
+                                    kernel_releases=kernel_releases
+                                )
 
         self.assertEqual(skopeo_copy.call_count, 2)
         self.assertEqual(run_cmd.call_args_list[0], call(["uname", "-m"]))
@@ -253,6 +272,13 @@ class AkmodsBuildAndPublishTests(unittest.TestCase):
                 ],
                 capture_output=False,
             ),
+        )
+        publish_metadata.assert_called_once_with(
+            image_org="danathar",
+            akmods_repo="zfs-kinoite-containerfile-akmods",
+            kernel_flavor="main",
+            akmods_version="43",
+            kernel_releases=kernel_releases,
         )
 
     def test_main_builds_each_kernel_then_merges_shared_cache(self) -> None:

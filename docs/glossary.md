@@ -10,11 +10,14 @@ This page defines terms used across this repository's docs and workflow comments
 - `audit tag`: immutable stable tag written during promotion so one published snapshot can be referenced later.
 - `artifact`: a file/output saved by a workflow run so you can inspect or reuse it later.
 - `manifest`: a structured data file that records what a run produced or which exact inputs it used.
+- `checked-in defaults`: version-controlled default values stored in this repo, here in `ci/defaults.json`, instead of being copied into several workflow files.
 - `workflow`: one named GitHub Actions automation file.
 - `workflow run`: one execution of a GitHub Actions workflow from start to finish.
 - `pipeline`: the ordered set of jobs/steps in one workflow run.
+- `composite action`: a local reusable GitHub Action made from several smaller steps. This repo uses them to keep workflow YAML shorter without moving logic out of version control.
 - `build context`: the set of local files available to the container build.
 - `branch-scoped`: a tag/name that includes the branch identifier so branch artifacts stay isolated.
+- `sidecar tag`: a second image tag published next to a primary artifact tag, usually carrying metadata instead of the main payload. Here, `main-<fedora>-metadata` is the sidecar for the shared akmods cache.
 - `Fedora stream` / `kernel stream`: the ongoing flow of new kernel releases over time.
 - `tag`: a human-readable image label like `latest` or `candidate-deadbee-43`.
 - `image ref`: text that points to a container image, usually `name:tag` or `name@sha256:digest`.
@@ -29,6 +32,7 @@ This page defines terms used across this repository's docs and workflow comments
 - `stale module` / `stale kmod`: a kernel module built for an older kernel release than the one currently in the base image.
 - `hardening`: add safety checks or stricter rules so failures are less likely and easier to catch early.
 - `PR`: pull request.
+- `bot actor`: an automation account that triggered the workflow, for example `dependabot[bot]`.
 - `VM`: virtual machine.
 - `OCI`: Open Container Initiative standards used for container image formats and registries.
 - `YAML`: human-readable config format used by GitHub Actions workflows.

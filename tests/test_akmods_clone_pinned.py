@@ -1,10 +1,9 @@
 """
 Script: tests/test_akmods_clone_pinned.py
-What: Tests the local patching we apply to the cloned upstream akmods Justfile.
-Doing: Verifies the publish-name rule is rewritten to use images.yaml.
-Why: The native repo must not silently fall back to upstream's hardcoded
-`akmods-zfs` publish target.
-Goal: Fail fast if upstream Justfile structure changes under our patch step.
+What: Tests for cloning the pinned akmods fork checkout.
+Doing: Verifies the helper reads repo defaults, fetches one commit, and fails if Git resolves the wrong SHA.
+Why: The native repo now relies on the fork itself carrying the publish-name logic instead of patching the clone at runtime.
+Goal: Keep the clone step deterministic and fail closed on pin drift.
 """
 
 from __future__ import annotations
@@ -12,39 +11,47 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from ci_tools import akmods_clone_pinned as script
 
 
 class AkmodsClonePinnedTests(unittest.TestCase):
-    def test_patch_publish_name_resolution_rewrites_upstream_line(self) -> None:
+    def test_main_clones_exact_pinned_ref(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            worktree = Path(temp_dir)
-            justfile = worktree / "Justfile"
-            justfile.write_text(
-                script.UPSTREAM_AKMODS_NAME_LINE + "\n",
-                encoding="utf-8",
-            )
+            worktree = Path(temp_dir) / "akmods"
 
             with patch.object(script, "AKMODS_WORKTREE", worktree):
-                with patch.object(script, "JUSTFILE", justfile):
-                    script.patch_publish_name_resolution()
+                with patch(
+                    "ci_tools.akmods_clone_pinned.require_env_or_default",
+                    side_effect=["https://github.com/Danathar/akmods.git", "abcdef123456"],
+                ):
+                    with patch("ci_tools.akmods_clone_pinned.run_cmd", side_effect=["", "", "", "", "abcdef123456\n"]) as run_cmd:
+                        script.main()
 
-            content = justfile.read_text(encoding="utf-8")
-            self.assertIn(script.PATCHED_AKMODS_NAME_LINE, content)
-            self.assertNotIn(script.UPSTREAM_AKMODS_NAME_LINE, content)
+        self.assertEqual(
+            run_cmd.call_args_list,
+            [
+                call(["git", "init", "."], cwd=str(worktree)),
+                call(["git", "remote", "add", "origin", "https://github.com/Danathar/akmods.git"], cwd=str(worktree)),
+                call(["git", "fetch", "--depth", "1", "origin", "abcdef123456"], cwd=str(worktree)),
+                call(["git", "checkout", "--detach", "FETCH_HEAD"], cwd=str(worktree)),
+                call(["git", "rev-parse", "HEAD"], cwd=str(worktree)),
+            ],
+        )
 
-    def test_patch_publish_name_resolution_fails_if_upstream_line_changes(self) -> None:
+    def test_main_rejects_resolved_sha_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            worktree = Path(temp_dir)
-            justfile = worktree / "Justfile"
-            justfile.write_text("akmods_name := 'unexpected'\n", encoding="utf-8")
+            worktree = Path(temp_dir) / "akmods"
 
             with patch.object(script, "AKMODS_WORKTREE", worktree):
-                with patch.object(script, "JUSTFILE", justfile):
-                    with self.assertRaisesRegex(RuntimeError, "no longer matches"):
-                        script.patch_publish_name_resolution()
+                with patch(
+                    "ci_tools.akmods_clone_pinned.require_env_or_default",
+                    side_effect=["https://github.com/Danathar/akmods.git", "abcdef123456"],
+                ):
+                    with patch("ci_tools.akmods_clone_pinned.run_cmd", side_effect=["", "", "", "", "deadbeef\n"]):
+                        with self.assertRaisesRegex(RuntimeError, "Pinned ref mismatch"):
+                            script.main()
 
 
 if __name__ == "__main__":

@@ -12,12 +12,17 @@ from dataclasses import dataclass
 import tempfile
 from pathlib import Path
 
+from ci_tools.akmods_cache_metadata import (
+    parse_kernel_releases_from_labels,
+    shared_cache_metadata_tag,
+)
 from ci_tools.common import (
     CiToolError,
     kernel_releases_from_env,
     load_layer_files_from_oci_layout,
     normalize_owner,
     require_env,
+    skopeo_inspect_json,
     skopeo_copy,
     skopeo_exists,
     unpack_layer_tarballs,
@@ -38,6 +43,8 @@ class AkmodsCacheStatus:
     source_image: str
     image_exists: bool
     missing_releases: tuple[str, ...]
+    metadata_image: str = ""
+    inspection_method: str = "unpacked-image"
 
     @property
     def reusable(self) -> bool:
@@ -77,12 +84,40 @@ def inspect_akmods_cache(
     """
 
     source_image = f"ghcr.io/{image_org}/{source_repo}:main-{fedora_version}"
+    metadata_image = (
+        f"ghcr.io/{image_org}/{source_repo}:"
+        f"{shared_cache_metadata_tag(kernel_flavor='main', akmods_version=fedora_version)}"
+    )
     if not skopeo_exists(f"docker://{source_image}"):
         return AkmodsCacheStatus(
             source_image=source_image,
             image_exists=False,
             missing_releases=tuple(kernel_releases),
+            metadata_image=metadata_image,
+            inspection_method="missing-image",
         )
+
+    if skopeo_exists(f"docker://{metadata_image}"):
+        inspect_json = skopeo_inspect_json(f"docker://{metadata_image}")
+        labels = inspect_json.get("Labels") or {}
+        try:
+            cached_kernel_releases = parse_kernel_releases_from_labels(labels)
+        except CiToolError as exc:
+            print(
+                f"Metadata sidecar {metadata_image} is malformed ({exc}); "
+                "falling back to full shared-cache inspection."
+            )
+        else:
+            missing_releases = [
+                release for release in kernel_releases if release not in cached_kernel_releases
+            ]
+            return AkmodsCacheStatus(
+                source_image=source_image,
+                image_exists=True,
+                missing_releases=tuple(missing_releases),
+                metadata_image=metadata_image,
+                inspection_method="metadata-sidecar",
+            )
 
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
@@ -97,6 +132,8 @@ def inspect_akmods_cache(
             source_image=source_image,
             image_exists=True,
             missing_releases=tuple(missing_releases),
+            metadata_image=metadata_image,
+            inspection_method="unpacked-image",
         )
 
 
@@ -116,19 +153,29 @@ def main() -> None:
     )
 
     if not status.image_exists:
-        write_github_outputs({"exists": "false"})
+        write_github_outputs({"exists": "false", "metadata_exists": "false"})
         print(f"No existing shared akmods cache image for Fedora {fedora_version}; rebuild is required.")
         return
 
     if status.reusable:
-        write_github_outputs({"exists": "true"})
+        write_github_outputs(
+            {
+                "exists": "true",
+                "metadata_exists": "true" if status.inspection_method == "metadata-sidecar" else "false",
+            }
+        )
         print(
             f"Found matching {status.source_image} kmods for kernels {' '.join(kernel_releases)}; "
-            "akmods rebuild can be skipped."
+            f"akmods rebuild can be skipped. Inspection method: {status.inspection_method}."
         )
         return
 
-    write_github_outputs({"exists": "false"})
+    write_github_outputs(
+        {
+            "exists": "false",
+            "metadata_exists": "true" if status.inspection_method == "metadata-sidecar" else "false",
+        }
+    )
     print(
         f"Cached {status.source_image} is present but missing kmods for kernels "
         f"{' '.join(status.missing_releases)}; "

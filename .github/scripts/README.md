@@ -17,12 +17,14 @@ If a term is unfamiliar, check the shared glossary first:
 | Resolve build inputs | `resolve-build-inputs` | `ci_tools.resolve_build_inputs` |
 | Write build inputs manifest | `write-build-inputs-manifest` | `ci_tools.write_build_inputs_manifest` |
 | Check shared akmods cache | `check-akmods-cache` | `ci_tools.check_akmods_cache` |
+| Export checked-in repo defaults for workflow steps | `export-repo-defaults` | `ci_tools.export_repo_defaults` |
+| Publish or repair the shared-cache metadata sidecar tag | `publish-akmods-cache-metadata` | `ci_tools.publish_akmods_cache_metadata` |
 | Resolve PR/branch validation inputs and verify shared akmods cache | `prepare-validation-build` | `ci_tools.prepare_validation_build` |
 | Compute branch-safe image tag prefix | `compute-branch-metadata` | `ci_tools.compute_branch_metadata` |
 | Promote candidate digest to latest and audit tags | `promote-stable` | `ci_tools.promote_stable` |
 | Sign one published image tag by digest | `sign-image` | `ci_tools.sign_image` |
 Note: branch workflows skip this step when `SIGNING_SECRET` is unavailable, which is expected for some automation actors such as Dependabot.
-| Clone pinned upstream akmods tooling and patch publish-name behavior | `akmods-clone-pinned` | `ci_tools.akmods_clone_pinned` |
+| Clone pinned upstream akmods tooling and verify the exact SHA | `akmods-clone-pinned` | `ci_tools.akmods_clone_pinned` |
 | Configure target image path for the akmods build wrapper | `akmods-configure-zfs-target` | `ci_tools.akmods_configure_zfs_target` |
 | Build and publish shared self-hosted ZFS akmods image | `akmods-build-and-publish` | `ci_tools.akmods_build_and_publish` |
 
@@ -32,5 +34,21 @@ Note: branch workflows skip this step when `SIGNING_SECRET` is unavailable, whic
   - main candidate build, promotion, and signing
 - [`build-branch.yml`](../workflows/build-branch.yml)
   - branch-tagged push using read-only shared-cache validation
+  - bot-authored runs stop after local validation and do not push/sign public branch tags
 - [`build-pr.yml`](../workflows/build-pr.yml)
   - no-push validation build
+
+## Local Workflow Actions
+
+These composite actions keep the workflow YAML focused on job order and data flow:
+
+- [`load-ci-defaults`](../actions/load-ci-defaults/action.yml)
+  - exports values from `ci/defaults.json`
+- [`prepare-registry-context`](../actions/prepare-registry-context/action.yml)
+  - computes lowercase GHCR paths and whether the actor is a bot account
+- [`build-native-image`](../actions/build-native-image/action.yml)
+  - wraps the standard buildah invocation and build arguments for this repo
+- [`install-signing-tools`](../actions/install-signing-tools/action.yml)
+  - installs `skopeo` and `cosign`
+- [`publish-native-image`](../actions/publish-native-image/action.yml)
+  - logs in to GHCR, pushes one tag, and signs it when a private key is available

@@ -27,6 +27,7 @@ from ci_tools.common import (
     sort_kernel_releases,
     unpack_layer_tarballs,
 )
+from ci_tools.akmods_cache_metadata import publish_shared_cache_metadata, shared_cache_tag
 
 
 AKMODS_WORKTREE = Path("/tmp/akmods")
@@ -198,7 +199,7 @@ def merge_and_push_shared_cache_image(*, kernel_releases: list[str]) -> None:
     image_org = normalize_owner(require_env("GITHUB_REPOSITORY_OWNER"))
     arch = run_cmd(["uname", "-m"]).strip()
 
-    shared_tag = f"{kernel_flavor}-{akmods_version}"
+    shared_tag = shared_cache_tag(kernel_flavor=kernel_flavor, akmods_version=akmods_version)
     local_shared_ref = f"localhost/{akmods_repo}:{shared_tag}"
     local_shared_arch_ref = f"{local_shared_ref}-{arch}"
 
@@ -275,6 +276,13 @@ def merge_and_push_shared_cache_image(*, kernel_releases: list[str]) -> None:
         "Published merged shared akmods cache: "
         f"ghcr.io/{image_org}/{akmods_repo}:{shared_tag}"
     )
+    publish_shared_cache_metadata(
+        image_org=image_org,
+        akmods_repo=akmods_repo,
+        kernel_flavor=kernel_flavor,
+        akmods_version=akmods_version,
+        kernel_releases=kernel_releases,
+    )
 
 
 def main() -> None:
@@ -300,6 +308,13 @@ def main() -> None:
             shared_cache_path=True,
         )
         run_cmd(["just", "manifest"], cwd=str(AKMODS_WORKTREE), capture_output=False)
+        publish_shared_cache_metadata(
+            image_org=normalize_owner(require_env("GITHUB_REPOSITORY_OWNER")),
+            akmods_repo=require_env("AKMODS_REPO"),
+            kernel_flavor=require_env("AKMODS_KERNEL"),
+            akmods_version=require_env("AKMODS_VERSION"),
+            kernel_releases=kernel_releases,
+        )
         return
 
     # Authenticate once, then publish one kernel-specific payload at a time.

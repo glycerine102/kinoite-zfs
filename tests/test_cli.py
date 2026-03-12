@@ -20,6 +20,8 @@ class CliTests(unittest.TestCase):
             "resolve-build-inputs",
             "write-build-inputs-manifest",
             "check-akmods-cache",
+            "export-repo-defaults",
+            "publish-akmods-cache-metadata",
             "prepare-validation-build",
             "compute-branch-metadata",
             "promote-stable",

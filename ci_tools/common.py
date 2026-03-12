@@ -8,6 +8,7 @@ Goal: Keep behavior consistent across all helper modules.
 
 from __future__ import annotations
 
+from functools import lru_cache
 import json
 import os
 import re
@@ -23,6 +24,8 @@ class CiToolError(RuntimeError):
 
 FEDORA_FROM_KERNEL_RE = re.compile(r".*fc([0-9]+).*")
 NATURAL_SORT_SPLIT_RE = re.compile(r"([0-9]+)")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_DEFAULTS_FILE = REPO_ROOT / "ci" / "defaults.json"
 
 
 def require_env(name: str) -> str:
@@ -36,6 +39,50 @@ def require_env(name: str) -> str:
 def optional_env(name: str, default: str = "") -> str:
     """Return an environment variable with a fallback default."""
     return os.environ.get(name, default)
+
+
+@lru_cache(maxsize=1)
+def load_repo_defaults() -> dict[str, str]:
+    """
+    Load checked-in repository defaults from `ci/defaults.json`.
+
+    Keeping these defaults in version control makes workflow input changes
+    reviewable. The workflows still pass explicit overrides when needed, but the
+    default values themselves live in one file instead of being copied across
+    multiple workflow YAML files.
+    """
+    if not REPO_DEFAULTS_FILE.exists():
+        raise CiToolError(f"Missing repository defaults file: {REPO_DEFAULTS_FILE}")
+
+    with REPO_DEFAULTS_FILE.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+
+    defaults: dict[str, str] = {}
+    for key, value in data.items():
+        defaults[str(key)] = str(value)
+    return defaults
+
+
+def require_env_or_default(name: str) -> str:
+    """
+    Return an environment variable, falling back to checked-in repo defaults.
+
+    This keeps the Python helpers honest even if workflow YAML becomes thinner
+    over time. A command still fails closed when the value is missing from both
+    env and `ci/defaults.json`.
+    """
+    value = os.environ.get(name)
+    if value is not None and value != "":
+        return value
+
+    default_value = load_repo_defaults().get(name, "")
+    if default_value:
+        return default_value
+
+    raise CiToolError(
+        f"Missing required environment variable: {name} "
+        f"(and no fallback exists in {REPO_DEFAULTS_FILE})"
+    )
 
 
 def kernel_releases_from_env(
@@ -110,6 +157,20 @@ def write_github_outputs(values: Mapping[str, str]) -> None:
     """
     output_file = require_env("GITHUB_OUTPUT")
     with open(output_file, "a", encoding="utf-8") as handle:
+        for key, value in values.items():
+            handle.write(f"{key}={value}\n")
+
+
+def write_github_env(values: Mapping[str, str]) -> None:
+    """
+    Export environment variables for later GitHub Actions steps.
+
+    GitHub exposes the file path through `GITHUB_ENV`. Writing `NAME=value`
+    lines there makes the variable available to subsequent steps in the same
+    job.
+    """
+    env_file = require_env("GITHUB_ENV")
+    with open(env_file, "a", encoding="utf-8") as handle:
         for key, value in values.items():
             handle.write(f"{key}={value}\n")
 
