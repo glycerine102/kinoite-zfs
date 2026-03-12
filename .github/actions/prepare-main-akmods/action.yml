@@ -1,0 +1,179 @@
+name: Prepare Main Akmods Build
+
+description: Resolve build inputs, upload the input manifest, verify shared akmods cache state, and rebuild the shared cache only when required.
+
+inputs:
+  use_input_lock:
+    description: Whether to replay build inputs from a lock file.
+    required: true
+  lock_file:
+    description: Lock file path used when replay mode is enabled.
+    required: true
+  build_container_ref:
+    description: Build container image ref for the akmods job.
+    required: true
+  akmods_repo:
+    description: Shared akmods cache repository name.
+    required: true
+  akmods_upstream_repo:
+    description: Pinned akmods source repository URL.
+    required: true
+  rebuild_akmods:
+    description: Whether this run should rebuild the shared akmods cache even if a reusable cache already exists.
+    required: true
+  registry_actor:
+    description: Registry username used for metadata backfill and cache publishing.
+    required: true
+  registry_token:
+    description: Registry token used for metadata backfill and cache publishing.
+    required: true
+
+outputs:
+  version:
+    description: Fedora major version resolved for this run.
+    value: ${{ steps.resolve.outputs.version }}
+  kernel_release:
+    description: Primary kernel release resolved for this run.
+    value: ${{ steps.resolve.outputs.kernel_release }}
+  kernel_releases:
+    description: Full kernel release list resolved for this run.
+    value: ${{ steps.resolve.outputs.kernel_releases }}
+  base_image_ref:
+    description: Base image ref before digest pinning.
+    value: ${{ steps.resolve.outputs.base_image_ref }}
+  base_image_name:
+    description: Base image repository name.
+    value: ${{ steps.resolve.outputs.base_image_name }}
+  base_image_tag:
+    description: Stable base image tag selected for this run.
+    value: ${{ steps.resolve.outputs.base_image_tag }}
+  base_image_pinned:
+    description: Digest-pinned base image ref.
+    value: ${{ steps.resolve.outputs.base_image_pinned }}
+  base_image_digest:
+    description: Base image digest used for this run.
+    value: ${{ steps.resolve.outputs.base_image_digest }}
+  build_container_ref:
+    description: Build container ref before digest pinning.
+    value: ${{ steps.resolve.outputs.build_container_ref }}
+  build_container_pinned:
+    description: Digest-pinned build container ref.
+    value: ${{ steps.resolve.outputs.build_container_pinned }}
+  build_container_digest:
+    description: Build container digest used for this run.
+    value: ${{ steps.resolve.outputs.build_container_digest }}
+  zfs_minor_version:
+    description: OpenZFS minor line used for this run.
+    value: ${{ steps.resolve.outputs.zfs_minor_version }}
+  akmods_upstream_ref:
+    description: Pinned akmods source commit used for this run.
+    value: ${{ steps.resolve.outputs.akmods_upstream_ref }}
+  use_input_lock:
+    description: Whether lock replay mode was active.
+    value: ${{ steps.resolve.outputs.use_input_lock }}
+  lock_file_path:
+    description: Lock file path recorded in the resolved inputs.
+    value: ${{ steps.resolve.outputs.lock_file_path }}
+  akmods_cache_exists:
+    description: Whether a reusable shared akmods cache was found.
+    value: ${{ steps.cache.outputs.exists }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      name: Resolve build inputs for this run
+      shell: bash
+      env:
+        USE_INPUT_LOCK: ${{ inputs.use_input_lock }}
+        LOCK_FILE: ${{ inputs.lock_file }}
+        BUILD_CONTAINER_REF: ${{ inputs.build_container_ref }}
+      run: |
+        python3 -m ci_tools.cli resolve-build-inputs
+
+    - name: Write build inputs manifest
+      shell: bash
+      env:
+        USE_INPUT_LOCK: ${{ steps.resolve.outputs.use_input_lock }}
+        LOCK_FILE_PATH: ${{ steps.resolve.outputs.lock_file_path }}
+        FEDORA_VERSION: ${{ steps.resolve.outputs.version }}
+        KERNEL_RELEASE: ${{ steps.resolve.outputs.kernel_release }}
+        KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
+        BASE_IMAGE_REF: ${{ steps.resolve.outputs.base_image_ref }}
+        BASE_IMAGE_NAME: ${{ steps.resolve.outputs.base_image_name }}
+        BASE_IMAGE_TAG: ${{ steps.resolve.outputs.base_image_tag }}
+        BASE_IMAGE_PINNED: ${{ steps.resolve.outputs.base_image_pinned }}
+        BASE_IMAGE_DIGEST: ${{ steps.resolve.outputs.base_image_digest }}
+        BUILD_CONTAINER_REF: ${{ steps.resolve.outputs.build_container_ref }}
+        BUILD_CONTAINER_PINNED: ${{ steps.resolve.outputs.build_container_pinned }}
+        BUILD_CONTAINER_DIGEST: ${{ steps.resolve.outputs.build_container_digest }}
+        ZFS_MINOR_VERSION: ${{ steps.resolve.outputs.zfs_minor_version }}
+        AKMODS_UPSTREAM_REF: ${{ steps.resolve.outputs.akmods_upstream_ref }}
+      run: |
+        python3 -m ci_tools.cli write-build-inputs-manifest
+
+    - name: Upload build inputs manifest
+      uses: actions/upload-artifact@v7
+      with:
+        name: build-inputs-${{ github.run_id }}
+        path: artifacts/build-inputs.json
+        if-no-files-found: error
+
+    - id: cache
+      name: Check for existing shared akmods cache
+      shell: bash
+      env:
+        FEDORA_VERSION: ${{ steps.resolve.outputs.version }}
+        KERNEL_RELEASE: ${{ steps.resolve.outputs.kernel_release }}
+        KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
+        AKMODS_REPO: ${{ inputs.akmods_repo }}
+      run: |
+        python3 -m ci_tools.cli check-akmods-cache
+
+    - name: Publish metadata tag for existing shared akmods cache
+      if: steps.cache.outputs.exists == 'true' && steps.cache.outputs.metadata_exists != 'true'
+      shell: bash
+      env:
+        KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
+        AKMODS_VERSION: ${{ steps.resolve.outputs.version }}
+        AKMODS_KERNEL: main
+        AKMODS_REPO: ${{ inputs.akmods_repo }}
+        REGISTRY_ACTOR: ${{ inputs.registry_actor }}
+        REGISTRY_TOKEN: ${{ inputs.registry_token }}
+      run: |
+        python3 -m ci_tools.cli publish-akmods-cache-metadata
+
+    - name: Clone pinned upstream akmods tooling
+      shell: bash
+      env:
+        AKMODS_UPSTREAM_REPO: ${{ inputs.akmods_upstream_repo }}
+        AKMODS_UPSTREAM_REF: ${{ steps.resolve.outputs.akmods_upstream_ref }}
+      run: |
+        python3 -m ci_tools.cli akmods-clone-pinned
+
+    - name: Configure shared ZFS target in self-hosted namespace
+      if: inputs.rebuild_akmods == 'true' || steps.cache.outputs.exists != 'true'
+      shell: bash
+      env:
+        FEDORA_VERSION: ${{ steps.resolve.outputs.version }}
+        AKMODS_REPO: ${{ inputs.akmods_repo }}
+        AKMODS_DESCRIPTION: Shared cache image for pre-built zfs akmod RPMs
+      run: |
+        python3 -m ci_tools.cli akmods-configure-zfs-target
+
+    - name: Build and publish shared self-hosted ZFS akmods image
+      if: inputs.rebuild_akmods == 'true' || steps.cache.outputs.exists != 'true'
+      shell: bash
+      env:
+        AKMODS_KERNEL: main
+        AKMODS_VERSION: ${{ steps.resolve.outputs.version }}
+        KERNEL_RELEASE: ${{ steps.resolve.outputs.kernel_release }}
+        KERNEL_RELEASES: ${{ steps.resolve.outputs.kernel_releases }}
+        AKMODS_REPO: ${{ inputs.akmods_repo }}
+        AKMODS_TARGET: zfs
+        ZFS_MINOR_VERSION: ${{ steps.resolve.outputs.zfs_minor_version }}
+        CI: "1"
+        REGISTRY_ACTOR: ${{ inputs.registry_actor }}
+        REGISTRY_TOKEN: ${{ inputs.registry_token }}
+      run: |
+        python3 -m ci_tools.cli akmods-build-and-publish

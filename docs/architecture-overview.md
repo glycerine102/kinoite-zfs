@@ -28,6 +28,11 @@ That means the main complexity now lives in two places only:
 1. input pinning and akmods cache control in `ci_tools/`
 2. image-build-time ZFS install logic in `containerfiles/zfs-akmods/install_zfs_from_akmods_cache.py`
 
+One smaller cleanup also matters for readability:
+
+- repo-owned data-shaping logic now lives in tracked Python helpers instead of
+  inline workflow shell wherever that tradeoff is reasonable
+
 ## Outputs
 
 ### OS Image Repository
@@ -66,6 +71,17 @@ The main workflow resolves and pins:
 6. ZFS minor version line
 
 Those values are written to a saved workflow output file named `build-inputs-<run_id>` so the same input set can be replayed later.
+
+The `main` workflow now wraps that whole preparation path in one local action:
+
+- [`.github/actions/prepare-main-akmods/action.yml`](../.github/actions/prepare-main-akmods/action.yml)
+
+That action does four things in one place:
+
+1. resolve and record build inputs
+2. upload the build-input manifest
+3. verify whether the shared akmods cache can be reused
+4. rebuild and republish the shared cache only when required
 
 ### 2. Shared Akmods Cache Reuse Or Rebuild
 
@@ -134,6 +150,13 @@ It does four important things:
 4. writes repository-specific signing policy for `ghcr.io/danathar/zfs-kinoite-containerfile`
 5. finalizes the image with `ostree container commit`
 
+The signing-policy step is now a pure Python helper:
+
+- [`files/scripts/configure_signing_policy.py`](../files/scripts/configure_signing_policy.py)
+
+That removed the earlier shell script that embedded an inline Python block just
+to write `policy.json`.
+
 ### 4. Multi-Kernel ZFS Install Logic
 
 The hardest part is still this:
@@ -172,9 +195,12 @@ Because candidate and stable tags are in the same repository, the trust model is
 ## Operational Model
 
 1. `build.yml`: candidate-first build and promotion
+   - the workflow now uses small Python helpers for registry-context export and
+     candidate-tag generation instead of inline shell snippets
 2. `build-branch.yml`: read-only validation inputs plus branch-tagged push
    - bot-authored branch runs still build locally but intentionally skip push and signing
    - human-authored branch runs push/sign normally
+   - the final branch image tag is now composed by a small Python helper
 3. `build-pr.yml`: read-only validation inputs plus no-push build
 
 ## Design Principles

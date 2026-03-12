@@ -17,10 +17,13 @@ If a term is unfamiliar, check the shared glossary first:
 | Resolve build inputs | `resolve-build-inputs` | `ci_tools.resolve_build_inputs` |
 | Write build inputs manifest | `write-build-inputs-manifest` | `ci_tools.write_build_inputs_manifest` |
 | Check shared akmods cache | `check-akmods-cache` | `ci_tools.check_akmods_cache` |
+| Export normalized registry context for later workflow steps | `export-registry-context` | `ci_tools.export_registry_context` |
 | Export checked-in repo defaults for workflow steps | `export-repo-defaults` | `ci_tools.export_repo_defaults` |
 | Publish or repair the shared-cache metadata tag | `publish-akmods-cache-metadata` | `ci_tools.publish_akmods_cache_metadata` |
 | Resolve pull request (PR) and branch validation inputs and verify shared akmods cache | `prepare-validation-build` | `ci_tools.prepare_validation_build` |
 | Compute branch-safe image tag prefix | `compute-branch-metadata` | `ci_tools.compute_branch_metadata` |
+| Compose final branch image tag | `compose-branch-image-tag` | `ci_tools.compose_branch_image_tag` |
+| Compute candidate image tag | `compute-candidate-tag` | `ci_tools.compute_candidate_tag` |
 | Promote candidate digest to latest and audit tags | `promote-stable` | `ci_tools.promote_stable` |
 | Sign one published image tag by digest | `sign-image` | `ci_tools.sign_image` |
 Note: branch workflows skip this step when `SIGNING_SECRET` is unavailable, which is expected for some automation actors such as Dependabot.
@@ -44,6 +47,8 @@ These composite actions keep the workflow files focused on job order and data fl
 
 - [`load-ci-defaults`](../actions/load-ci-defaults/action.yml)
   - exports values from `ci/defaults.json`
+- [`prepare-main-akmods`](../actions/prepare-main-akmods/action.yml)
+  - resolves main-workflow inputs, uploads the build-input manifest, verifies shared akmods cache state, and rebuilds the shared cache only when required
 - [`prepare-registry-context`](../actions/prepare-registry-context/action.yml)
   - computes lowercase GitHub Container Registry (GHCR) paths and whether the current account is an automation bot
 - [`build-native-image`](../actions/build-native-image/action.yml)

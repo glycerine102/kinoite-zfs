@@ -39,7 +39,7 @@ python3 /containerfiles/zfs-akmods/install_zfs_from_akmods_cache.py
 # host-side repair steps.
 IMAGE_REPO="${IMAGE_REPO}" \
 SIGNING_KEY_FILENAME="${SIGNING_KEY_FILENAME}" \
-/files/scripts/configure-signing-policy.sh
+python3 /files/scripts/configure_signing_policy.py
 
 # `bootc container lint` expects package-created state directories under `/var`
 # to have matching tmpfiles declarations. The `zfs` dependency chain pulls in

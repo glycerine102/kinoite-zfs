@@ -152,10 +152,11 @@ At a high level, the final image build now works like this:
 3. `build_files/build-image.sh` enables the brew services/timers, installs `distrobox`, installs ZFS RPMs (Red Hat Package Manager package files) from the shared akmods cache image, writes signing policy, and commits the ostree container
 4. `bootc container lint` validates the final image
 
-Two workflow-side simplifications now support that image build:
+Three workflow-side simplifications now support that image build:
 
 1. `ci/defaults.json` is the one checked-in source of truth for default image refs, image names, and the pinned akmods fork commit
 2. the shared akmods cache publishes a `main-<fedora>-metadata` metadata tag so later validation runs can usually answer cache-reuse questions from registry metadata alone
+3. small repo-owned Python helpers now handle registry-context export, candidate-tag generation, branch-tag composition, and signing-policy file generation instead of leaving that logic inline in workflow or shell snippets
 
 The ZFS install step still has one important workaround:
 

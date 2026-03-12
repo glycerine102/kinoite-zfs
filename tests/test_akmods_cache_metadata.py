@@ -2,7 +2,7 @@
 Script: tests/test_akmods_cache_metadata.py
 What: Tests for shared akmods cache metadata helpers.
 Doing: Verifies label generation/parsing and the tiny metadata-image publish command sequence.
-Why: The metadata sidecar is the new fast path for cache reuse checks.
+Why: The metadata tag is the new fast path for cache reuse checks.
 Goal: Keep cache metadata explicit, parseable, and cheap to publish.
 """
 
@@ -42,7 +42,7 @@ class AkmodsCacheMetadataTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "missing required key"):
             parse_kernel_releases_from_labels({})
 
-    def test_publish_shared_cache_metadata_builds_and_pushes_sidecar_image(self) -> None:
+    def test_publish_shared_cache_metadata_builds_and_pushes_metadata_image(self) -> None:
         with patch("ci_tools.akmods_cache_metadata.run_cmd") as run_cmd:
             publish_shared_cache_metadata(
                 image_org="danathar",
