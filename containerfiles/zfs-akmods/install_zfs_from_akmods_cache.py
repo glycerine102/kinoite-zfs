@@ -9,14 +9,13 @@ Goal: Keep the image build logic explicit while reducing the older multi-kernel 
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-
+from dataclasses import dataclass
+from pathlib import Path
 
 # The build copies repo helper modules into `/shared`, but Python started with
 # `python3 /containerfiles/.../install_zfs_from_akmods_cache.py` only adds the
@@ -28,12 +27,11 @@ if str(IMAGE_ROOT) not in sys.path:
 
 from shared.oci_layout import load_layer_files_from_oci_layout, unpack_layer_tarballs
 
-
 LAYOUT_DIR = Path("/tmp/akmods-zfs")
 EXTRACT_ROOT = Path("/tmp")
 RPM_SEARCH_ROOT = EXTRACT_ROOT / "rpms" / "kmods" / "zfs"
 MODULES_ROOT = Path("/lib/modules")
-DEFAULT_AKMODS_IMAGE_TEMPLATE = "ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-{fedora}"
+DEFAULT_AKMODS_IMAGE_TEMPLATE = "ghcr.io/glycerine102/kinoite-zfs-akmods:main-{fedora}"
 
 
 @dataclass(frozen=True)
@@ -84,11 +82,7 @@ def _run_cmd(
 def image_kernels_from_modules_root(modules_root: Path = MODULES_ROOT) -> list[str]:
     """Return the kernel release directories already present in the base image."""
 
-    kernels = sorted(
-        entry.name
-        for entry in modules_root.iterdir()
-        if entry.is_dir()
-    )
+    kernels = sorted(entry.name for entry in modules_root.iterdir() if entry.is_dir())
     if not kernels:
         raise RuntimeError(f"No kernel directories found in {modules_root}")
     return kernels
@@ -106,7 +100,9 @@ def fedora_major_version(*, run_cmd=_run_cmd) -> str:
 
     fedora_version = run_cmd(["rpm", "-E", "%fedora"]).strip()
     if not fedora_version:
-        raise RuntimeError("Could not determine Fedora major version from rpm -E %fedora")
+        raise RuntimeError(
+            "Could not determine Fedora major version from rpm -E %fedora"
+        )
     return fedora_version
 
 
@@ -136,7 +132,9 @@ def resolve_akmods_image(
     return image_template.format(fedora=fedora_major_version(run_cmd=run_cmd))
 
 
-def copy_oci_layout_from_registry(image_ref: str, layout_dir: Path = LAYOUT_DIR) -> None:
+def copy_oci_layout_from_registry(
+    image_ref: str, layout_dir: Path = LAYOUT_DIR
+) -> None:
     """Pull the akmods cache image into a local `dir:` OCI layout."""
 
     if layout_dir.exists():
@@ -174,9 +172,7 @@ def discover_zfs_rpms(rpm_root: Path = RPM_SEARCH_ROOT) -> list[Path]:
 def rpm_name(rpm_path: Path) -> str:
     """Read the RPM package name from one cached RPM file."""
 
-    return _run_cmd(
-        ["rpm", "-qp", "--qf", "%{NAME}\n", str(rpm_path)]
-    ).strip()
+    return _run_cmd(["rpm", "-qp", "--qf", "%{NAME}\n", str(rpm_path)]).strip()
 
 
 def kmod_kernel_release(rpm_path: Path) -> str:
@@ -204,10 +200,7 @@ def version_sort_key(value: str) -> list[tuple[int, object]]:
     """
 
     parts = re.findall(r"\d+|[^\d]+", value)
-    return [
-        (0, int(part)) if part.isdigit() else (1, part)
-        for part in parts
-    ]
+    return [(0, int(part)) if part.isdigit() else (1, part) for part in parts]
 
 
 def build_install_plan(

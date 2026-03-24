@@ -9,8 +9,8 @@ Goal: Keep rebuild decisions fail-closed when the required primary-kernel RPM is
 from __future__ import annotations
 
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from ci_tools.check_akmods_cache import _has_kernel_matching_rpm, inspect_akmods_cache
@@ -22,15 +22,17 @@ class CheckAkmodsCacheTests(unittest.TestCase):
             root = Path(temp_dir)
             rpm_dir = root / "rpms" / "kmods" / "zfs"
             rpm_dir.mkdir(parents=True, exist_ok=True)
-            (rpm_dir / "kmod-zfs-6.18.13-200.fc43.x86_64-2.4.1-1.fc43.x86_64.rpm").touch()
+            (
+                rpm_dir / "kmod-zfs-6.18.13-200.fc43.x86_64-2.4.1-1.fc43.x86_64.rpm"
+            ).touch()
 
-            self.assertFalse(
-                _has_kernel_matching_rpm(root, "6.18.16-200.fc43.x86_64")
-            )
+            self.assertFalse(_has_kernel_matching_rpm(root, "6.18.16-200.fc43.x86_64"))
 
     def test_inspect_akmods_cache_reads_shared_cache_image(self) -> None:
         def fake_exists(image_ref: str) -> bool:
-            return image_ref == "docker://ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-43"
+            return (
+                image_ref == "docker://ghcr.io/glycerine102/kinoite-zfs-akmods:main-43"
+            )
 
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -39,7 +41,7 @@ class CheckAkmodsCacheTests(unittest.TestCase):
                 image_dir = Path(destination.removeprefix("dir:"))
                 image_dir.mkdir(parents=True, exist_ok=True)
                 (image_dir / "manifest.json").write_text(
-                    "{\"layers\": [{\"digest\": \"sha256:layer\"}]}",
+                    '{"layers": [{"digest": "sha256:layer"}]}',
                     encoding="utf-8",
                 )
                 (image_dir / "layer").write_text("", encoding="utf-8")
@@ -54,8 +56,12 @@ class CheckAkmodsCacheTests(unittest.TestCase):
                     rpm_dir / "kmod-zfs-6.18.16-200.fc43.x86_64-2.4.1-1.fc43.x86_64.rpm"
                 ).touch()
 
-            with patch("ci_tools.check_akmods_cache.skopeo_exists", side_effect=fake_exists):
-                with patch("ci_tools.check_akmods_cache.skopeo_copy", side_effect=fake_copy) as skopeo_copy:
+            with patch(
+                "ci_tools.check_akmods_cache.skopeo_exists", side_effect=fake_exists
+            ):
+                with patch(
+                    "ci_tools.check_akmods_cache.skopeo_copy", side_effect=fake_copy
+                ) as skopeo_copy:
                     with patch(
                         "ci_tools.check_akmods_cache.load_layer_files_from_oci_layout",
                         side_effect=fake_load_layers,
@@ -65,8 +71,8 @@ class CheckAkmodsCacheTests(unittest.TestCase):
                             side_effect=fake_unpack,
                         ):
                             status = inspect_akmods_cache(
-                                image_org="danathar",
-                                source_repo="zfs-kinoite-containerfile-akmods",
+                                image_org="glycerine102",
+                                source_repo="kinoite-zfs-akmods",
                                 fedora_version="43",
                                 kernel_release="6.18.16-200.fc43.x86_64",
                             )

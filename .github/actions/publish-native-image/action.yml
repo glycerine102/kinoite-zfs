@@ -4,7 +4,7 @@ description: Push one locally built image tag to GitHub Container Registry (GHCR
 
 inputs:
   image_registry:
-    description: Registry path, for example ghcr.io/danathar.
+    description: Registry path, for example ghcr.io/glycerine102.
     required: true
   image_name:
     description: Image name under the registry owner path.

@@ -23,8 +23,8 @@ FROM ${BASE_IMAGE}
 # not pass an explicit akmods image reference, the helper can render this
 # template with the Fedora version detected from the chosen base image.
 ARG AKMODS_IMAGE=""
-ARG AKMODS_IMAGE_TEMPLATE="ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-{fedora}"
-ARG IMAGE_REPO="ghcr.io/danathar/zfs-kinoite-containerfile"
+ARG AKMODS_IMAGE_TEMPLATE="ghcr.io/glycerine102/kinoite-zfs-akmods:main-{fedora}"
+ARG IMAGE_REPO="ghcr.io/glycerine102/kinoite-zfs"
 ARG SIGNING_KEY_FILENAME="zfs-kinoite-containerfile.pub"
 
 # Convert the build arguments into environment variables once so the helper

@@ -18,12 +18,12 @@ from ci_tools.sign_image import image_digest_ref, image_tag_ref, sign_published_
 class SignImageTests(unittest.TestCase):
     def test_builds_expected_refs(self) -> None:
         self.assertEqual(
-            image_tag_ref("danathar", "zfs-kinoite-containerfile", "latest"),
-            "docker://ghcr.io/danathar/zfs-kinoite-containerfile:latest",
+            image_tag_ref("glycerine102", "kinoite-zfs", "latest"),
+            "docker://ghcr.io/glycerine102/kinoite-zfs:latest",
         )
         self.assertEqual(
-            image_digest_ref("danathar", "zfs-kinoite-containerfile", "sha256:abc"),
-            "ghcr.io/danathar/zfs-kinoite-containerfile@sha256:abc",
+            image_digest_ref("glycerine102", "kinoite-zfs", "sha256:abc"),
+            "ghcr.io/glycerine102/kinoite-zfs@sha256:abc",
         )
 
     def test_requires_signing_key(self) -> None:
@@ -67,7 +67,7 @@ class SignImageTests(unittest.TestCase):
 
         self.assertEqual(
             digest_ref,
-            "ghcr.io/danathar/zfs-kinoite-containerfile@sha256:stable",
+            "ghcr.io/glycerine102/kinoite-zfs@sha256:stable",
         )
         self.assertEqual(calls[0][0][:4], ["cosign", "sign", "--yes", "--key"])
         self.assertEqual(calls[0][1], False)

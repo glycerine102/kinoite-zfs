@@ -39,17 +39,17 @@ One smaller cleanup also matters for readability:
 
 All operating-system image tags live in the same repository:
 
-- candidate tag: `ghcr.io/danathar/zfs-kinoite-containerfile:candidate-<sha>-<fedora>`
-- stable tag: `ghcr.io/danathar/zfs-kinoite-containerfile:latest`
-- stable audit tag: `ghcr.io/danathar/zfs-kinoite-containerfile:stable-<run>-<sha>`
-- branch tag: `ghcr.io/danathar/zfs-kinoite-containerfile:br-<branch>-<fedora>`
+- candidate tag: `ghcr.io/glycerine102/kinoite-zfs:candidate-<sha>-<fedora>`
+- stable tag: `ghcr.io/glycerine102/kinoite-zfs:latest`
+- stable audit tag: `ghcr.io/glycerine102/kinoite-zfs:stable-<run>-<sha>`
+- branch tag: `ghcr.io/glycerine102/kinoite-zfs:br-<branch>-<fedora>`
 
 ### Shared Akmods Cache Repository
 
 The shared cache remains separate because it is a different kind of build output:
 
-- `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>`
-- `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>-x86_64`
+- `ghcr.io/glycerine102/kinoite-zfs-akmods:main-<fedora>`
+- `ghcr.io/glycerine102/kinoite-zfs-akmods:main-<fedora>-x86_64`
 
 Why keep a separate akmods cache repository:
 
@@ -151,7 +151,7 @@ It does four important things:
 1. enables brew setup/update services via `systemctl preset`
 2. installs `distrobox` via `rpm-ostree install`
 3. runs the ZFS install helper against the resolved akmods cache image reference
-4. writes repository-specific signing policy for `ghcr.io/danathar/zfs-kinoite-containerfile`
+4. writes repository-specific signing policy for `ghcr.io/glycerine102/kinoite-zfs`
 5. finalizes the image with `ostree container commit`
 
 The signing-policy step is now a pure Python helper:

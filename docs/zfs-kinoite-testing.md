@@ -26,14 +26,14 @@ The objective is to validate that we can safely:
 
 ### Main Artifacts
 
-1. candidate OS image: `ghcr.io/danathar/zfs-kinoite-containerfile:candidate-<sha>-<fedora>`
-2. stable OS image: `ghcr.io/danathar/zfs-kinoite-containerfile:latest`
-3. stable audit tag: `ghcr.io/danathar/zfs-kinoite-containerfile:stable-<run>-<sha>`
-4. shared akmods cache image: `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>`
+1. candidate OS image: `ghcr.io/glycerine102/kinoite-zfs:candidate-<sha>-<fedora>`
+2. stable OS image: `ghcr.io/glycerine102/kinoite-zfs:latest`
+3. stable audit tag: `ghcr.io/glycerine102/kinoite-zfs:stable-<run>-<sha>`
+4. shared akmods cache image: `ghcr.io/glycerine102/kinoite-zfs-akmods:main-<fedora>`
 
 ### Branch Artifacts
 
-1. human-authored branch image: `ghcr.io/danathar/zfs-kinoite-containerfile:br-<branch>-<fedora>`
+1. human-authored branch image: `ghcr.io/glycerine102/kinoite-zfs:br-<branch>-<fedora>`
 2. bot-authored branch runs stop after local validation and do not push any public tag
 3. shared akmods cache stays the same shared source image; branch builds do not publish branch-specific cache tags
 

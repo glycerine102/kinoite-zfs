@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from pathlib import Path
 import sys
 import tarfile
 import tempfile
 import unittest
+from pathlib import Path
 
 
 def _load_helper_module():
@@ -42,11 +42,15 @@ helper = _load_helper_module()
 class InstallZfsFromAkmodsCacheTests(unittest.TestCase):
     def test_resolve_akmods_image_prefers_explicit_override(self) -> None:
         image_ref = helper.resolve_akmods_image(
-            environ={"AKMODS_IMAGE": "ghcr.io/example/zfs-kinoite-containerfile-akmods:manual"},
+            environ={
+                "AKMODS_IMAGE": "ghcr.io/example/zfs-kinoite-containerfile-akmods:manual"
+            },
             run_cmd=lambda _args: "43\n",
         )
 
-        self.assertEqual(image_ref, "ghcr.io/example/zfs-kinoite-containerfile-akmods:manual")
+        self.assertEqual(
+            image_ref, "ghcr.io/example/zfs-kinoite-containerfile-akmods:manual"
+        )
 
     def test_resolve_akmods_image_renders_template_with_detected_fedora(self) -> None:
         image_ref = helper.resolve_akmods_image(
@@ -56,7 +60,9 @@ class InstallZfsFromAkmodsCacheTests(unittest.TestCase):
             run_cmd=lambda _args: "43\n",
         )
 
-        self.assertEqual(image_ref, "ghcr.io/example/zfs-kinoite-containerfile-akmods:main-43")
+        self.assertEqual(
+            image_ref, "ghcr.io/example/zfs-kinoite-containerfile-akmods:main-43"
+        )
 
     def test_resolve_akmods_image_uses_default_template_when_unset(self) -> None:
         image_ref = helper.resolve_akmods_image(
@@ -64,7 +70,7 @@ class InstallZfsFromAkmodsCacheTests(unittest.TestCase):
             run_cmd=lambda _args: "43\n",
         )
 
-        self.assertEqual(image_ref, "ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-43")
+        self.assertEqual(image_ref, "ghcr.io/glycerine102/kinoite-zfs-akmods:main-43")
 
     def test_load_layer_files_from_oci_layout_reads_manifest_layers(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -181,10 +187,14 @@ class InstallZfsFromAkmodsCacheTests(unittest.TestCase):
                 kernel_release_lookup=lambda _path: "6.18.16-200.fc43.x86_64",
             )
 
-    def test_validate_installed_modules_checks_only_supported_primary_kernel(self) -> None:
+    def test_validate_installed_modules_checks_only_supported_primary_kernel(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             modules_root = Path(temp_dir)
-            supported_kernel = modules_root / "6.18.16-200.fc43.x86_64" / "extra" / "zfs"
+            supported_kernel = (
+                modules_root / "6.18.16-200.fc43.x86_64" / "extra" / "zfs"
+            )
             supported_kernel.mkdir(parents=True, exist_ok=True)
             (supported_kernel / "zfs.ko").touch()
 

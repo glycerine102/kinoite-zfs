@@ -35,8 +35,8 @@ This repository intentionally uses:
 
 1. a standard `Containerfile`
 2. direct `buildah`/Open Container Initiative (OCI) build arguments
-3. one image repository (`ghcr.io/danathar/zfs-kinoite-containerfile`)
-4. one shared akmods cache repository (`ghcr.io/danathar/zfs-kinoite-containerfile-akmods`)
+3. one image repository (`ghcr.io/glycerine102/kinoite-zfs`)
+4. one shared akmods cache repository (`ghcr.io/glycerine102/kinoite-zfs-akmods`)
 
 ## Safety Model
 
@@ -83,16 +83,16 @@ All of these tags are stored in GitHub Container Registry (GHCR), which is the c
 
 OS image tags in one repository:
 
-- candidate image: `ghcr.io/danathar/zfs-kinoite-containerfile:candidate-<sha>-<fedora>`
-- stable image: `ghcr.io/danathar/zfs-kinoite-containerfile:latest`
-- stable audit tag: `ghcr.io/danathar/zfs-kinoite-containerfile:stable-<run>-<sha>`
-- branch test image: `ghcr.io/danathar/zfs-kinoite-containerfile:br-<branch>-<fedora>`
+- candidate image: `ghcr.io/glycerine102/kinoite-zfs:candidate-<sha>-<fedora>`
+- stable image: `ghcr.io/glycerine102/kinoite-zfs:latest`
+- stable audit tag: `ghcr.io/glycerine102/kinoite-zfs:stable-<run>-<sha>`
+- branch test image: `ghcr.io/glycerine102/kinoite-zfs:br-<branch>-<fedora>`
   - bot-authored branch runs validate locally but intentionally do not push this tag
 
 Shared akmods cache image:
 
-- `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>`
-- architecture-specific inspection tag: `ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-<fedora>-x86_64`
+- `ghcr.io/glycerine102/kinoite-zfs-akmods:main-<fedora>`
+- architecture-specific inspection tag: `ghcr.io/glycerine102/kinoite-zfs-akmods:main-<fedora>-x86_64`
 
 The important simplification is this:
 
@@ -210,7 +210,7 @@ That logic lives in:
 Fresh stock Kinoite:
 
 ```bash
-sudo bootc switch ghcr.io/danathar/zfs-kinoite-containerfile:latest
+sudo bootc switch ghcr.io/glycerine102/kinoite-zfs:latest
 systemctl reboot
 ```
 
@@ -244,7 +244,7 @@ sudo zfs list
 ## Signature Verification
 
 ```bash
-cosign verify --key cosign.pub ghcr.io/danathar/zfs-kinoite-containerfile:latest
+cosign verify --key cosign.pub ghcr.io/glycerine102/kinoite-zfs:latest
 ```
 
 ## Reading Order

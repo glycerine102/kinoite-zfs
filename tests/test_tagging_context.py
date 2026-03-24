@@ -46,7 +46,9 @@ class TaggingContextTests(unittest.TestCase):
         )
 
     def test_sanitizes_branch_name(self) -> None:
-        self.assertEqual(sanitize_branch_name("Feature/My Branch!"), "feature-my-branch")
+        self.assertEqual(
+            sanitize_branch_name("Feature/My Branch!"), "feature-my-branch"
+        )
 
     def test_uses_fallback_when_branch_sanitizes_to_empty(self) -> None:
         self.assertEqual(sanitize_branch_name("!!!"), "branch")
@@ -68,8 +70,8 @@ class TaggingContextTests(unittest.TestCase):
                 actor_name="dependabot[bot]",
             ),
             {
-                "image_org": "danathar",
-                "image_registry": "ghcr.io/danathar",
+                "image_org": "glycerine102",
+                "image_registry": "ghcr.io/glycerine102",
                 "actor_is_bot": "true",
             },
         )
@@ -81,7 +83,7 @@ class TaggingContextTests(unittest.TestCase):
             with patch.dict(
                 os.environ,
                 {
-                    "GITHUB_REPOSITORY_OWNER": "Danathar",
+                    "GITHUB_REPOSITORY_OWNER": "glycerine102",
                     "GITHUB_ACTOR": "dependabot[bot]",
                     "GITHUB_OUTPUT": str(output_path),
                     "GITHUB_ENV": str(env_path),
@@ -90,9 +92,14 @@ class TaggingContextTests(unittest.TestCase):
             ):
                 main_export_registry_context()
 
-            self.assertIn("image_org=danathar", output_path.read_text(encoding="utf-8"))
+            self.assertIn(
+                "image_org=glycerine102", output_path.read_text(encoding="utf-8")
+            )
             self.assertIn("actor_is_bot=true", output_path.read_text(encoding="utf-8"))
-            self.assertIn("IMAGE_REGISTRY=ghcr.io/danathar", env_path.read_text(encoding="utf-8"))
+            self.assertIn(
+                "IMAGE_REGISTRY=ghcr.io/glycerine102",
+                env_path.read_text(encoding="utf-8"),
+            )
             self.assertIn("ACTOR_IS_BOT=true", env_path.read_text(encoding="utf-8"))
 
 

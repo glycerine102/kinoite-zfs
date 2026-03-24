@@ -57,7 +57,7 @@ class PrepareValidationBuildTests(unittest.TestCase):
                 os.environ,
                 {
                     "GITHUB_OUTPUT": output_path,
-                    "GITHUB_REPOSITORY_OWNER": "Danathar",
+                    "GITHUB_REPOSITORY_OWNER": "glycerine102",
                     "AKMODS_REPO": "zfs-kinoite-containerfile-akmods",
                 },
                 clear=False,
@@ -66,11 +66,13 @@ class PrepareValidationBuildTests(unittest.TestCase):
                     "ci_tools.prepare_validation_build.resolve_build_inputs",
                     return_value=resolution,
                 ):
-                    with patch("ci_tools.prepare_validation_build.clone_pinned_akmods") as clone_pinned:
+                    with patch(
+                        "ci_tools.prepare_validation_build.clone_pinned_akmods"
+                    ) as clone_pinned:
                         with patch(
                             "ci_tools.prepare_validation_build.inspect_akmods_cache",
                             return_value=AkmodsCacheStatus(
-                                source_image="ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-43",
+                                source_image="ghcr.io/glycerine102/kinoite-zfs-akmods:main-43",
                                 image_exists=True,
                                 missing_release="",
                             ),
@@ -87,7 +89,7 @@ class PrepareValidationBuildTests(unittest.TestCase):
             self.assertIn("base_image_tag=latest-20260307.1", outputs)
 
             inspect_cache.assert_called_once_with(
-                image_org="danathar",
+                image_org="glycerine102",
                 source_repo="zfs-kinoite-containerfile-akmods",
                 fedora_version="43",
                 kernel_release="6.18.16-200.fc43.x86_64",
@@ -103,7 +105,7 @@ class PrepareValidationBuildTests(unittest.TestCase):
                 os.environ,
                 {
                     "GITHUB_OUTPUT": output_path,
-                    "GITHUB_REPOSITORY_OWNER": "Danathar",
+                    "GITHUB_REPOSITORY_OWNER": "glycerine102",
                     "AKMODS_REPO": "zfs-kinoite-containerfile-akmods",
                 },
                 clear=False,
@@ -112,11 +114,13 @@ class PrepareValidationBuildTests(unittest.TestCase):
                     "ci_tools.prepare_validation_build.resolve_build_inputs",
                     return_value=resolution,
                 ):
-                    with patch("ci_tools.prepare_validation_build.clone_pinned_akmods") as clone_pinned:
+                    with patch(
+                        "ci_tools.prepare_validation_build.clone_pinned_akmods"
+                    ) as clone_pinned:
                         with patch(
                             "ci_tools.prepare_validation_build.inspect_akmods_cache",
                             return_value=AkmodsCacheStatus(
-                                source_image="ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-43",
+                                source_image="ghcr.io/glycerine102/kinoite-zfs-akmods:main-43",
                                 image_exists=True,
                                 missing_release="6.18.16-200.fc43.x86_64",
                             ),
@@ -125,7 +129,7 @@ class PrepareValidationBuildTests(unittest.TestCase):
                                 main()
 
             self.assertIn(
-                "ghcr.io/danathar/zfs-kinoite-containerfile-akmods:main-43",
+                "ghcr.io/glycerine102/kinoite-zfs-akmods:main-43",
                 str(context.exception),
             )
             self.assertIn("rebuild_akmods=true", str(context.exception))

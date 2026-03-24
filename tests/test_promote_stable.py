@@ -23,7 +23,7 @@ class PromoteStableTests(unittest.TestCase):
             with patch.dict(
                 os.environ,
                 {
-                    "GITHUB_REPOSITORY_OWNER": "Danathar",
+                    "GITHUB_REPOSITORY_OWNER": "glycerine102",
                     "REGISTRY_ACTOR": "actor",
                     "REGISTRY_TOKEN": "token",
                     "FEDORA_VERSION": "43",
@@ -33,27 +33,30 @@ class PromoteStableTests(unittest.TestCase):
                 },
                 clear=False,
             ):
-                with patch("ci_tools.promote_stable.skopeo_inspect_digest", return_value="sha256:abc") as digest_lookup:
+                with patch(
+                    "ci_tools.promote_stable.skopeo_inspect_digest",
+                    return_value="sha256:abc",
+                ) as digest_lookup:
                     with patch("ci_tools.promote_stable.skopeo_copy") as skopeo_copy:
                         main()
 
             digest_lookup.assert_called_once_with(
-                "docker://ghcr.io/danathar/zfs-kinoite-containerfile:candidate-deadbee-43",
+                "docker://ghcr.io/glycerine102/kinoite-zfs:candidate-deadbee-43",
                 creds="actor:token",
             )
             self.assertEqual(skopeo_copy.call_count, 2)
             self.assertEqual(
                 skopeo_copy.call_args_list[0].args[:2],
                 (
-                    "docker://ghcr.io/danathar/zfs-kinoite-containerfile@sha256:abc",
-                    "docker://ghcr.io/danathar/zfs-kinoite-containerfile:latest",
+                    "docker://ghcr.io/glycerine102/kinoite-zfs@sha256:abc",
+                    "docker://ghcr.io/glycerine102/kinoite-zfs:latest",
                 ),
             )
             self.assertEqual(
                 skopeo_copy.call_args_list[1].args[:2],
                 (
-                    "docker://ghcr.io/danathar/zfs-kinoite-containerfile@sha256:abc",
-                    "docker://ghcr.io/danathar/zfs-kinoite-containerfile:stable-12-deadbee",
+                    "docker://ghcr.io/glycerine102/kinoite-zfs@sha256:abc",
+                    "docker://ghcr.io/glycerine102/kinoite-zfs:stable-12-deadbee",
                 ),
             )
 

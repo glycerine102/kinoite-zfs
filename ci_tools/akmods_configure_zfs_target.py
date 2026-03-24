@@ -13,7 +13,6 @@ from pathlib import Path
 
 from ci_tools.common import CiToolError, normalize_owner, require_env, run_cmd
 
-
 AKMODS_WORKTREE = Path("/tmp/akmods")
 IMAGES_YAML = AKMODS_WORKTREE / "images.yaml"
 
@@ -24,8 +23,8 @@ def main() -> None:
     akmods_repo = require_env("AKMODS_REPO")
     akmods_description = require_env("AKMODS_DESCRIPTION")
     # Normalize owner means: convert to lowercase for consistent registry paths.
-    # This owner value is the image-owner portion (for example `danathar` in
-    # `ghcr.io/danathar/akmods-zfs`).
+    # This owner value is the image-owner portion (for example `glycerine102` in
+    # `ghcr.io/glycerine102/kinoite-zfs-akmods`).
     image_org = normalize_owner(require_env("GITHUB_REPOSITORY_OWNER"))
 
     if not IMAGES_YAML.exists():

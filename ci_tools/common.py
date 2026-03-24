@@ -8,11 +8,11 @@ Goal: Keep behavior consistent across all helper modules.
 
 from __future__ import annotations
 
-from functools import lru_cache
 import json
 import os
 import re
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -161,8 +161,8 @@ def normalize_owner(owner: str) -> str:
     Normalize a GitHub owner/org for container image paths.
 
     Here, "normalize" means converting to lowercase.
-    Example: `Danathar` becomes `danathar`, so image refs are consistent:
-    `ghcr.io/danathar/...`.
+    Example: `Glycerine102` becomes `glycerine102`, so image refs are consistent:
+    `ghcr.io/glycerine102/...`.
     """
     return owner.lower()
 
@@ -242,5 +242,7 @@ def extract_fedora_version(kernel_release: str) -> str:
     """
     match = FEDORA_FROM_KERNEL_RE.match(kernel_release)
     if not match:
-        raise CiToolError(f"Failed to extract Fedora version from kernel release {kernel_release}")
+        raise CiToolError(
+            f"Failed to extract Fedora version from kernel release {kernel_release}"
+        )
     return match.group(1)
